@@ -1,0 +1,149 @@
+
+.loomzi-product-card {
+  background: #fff;
+  border-radius: 20px;
+  padding: 10px;
+  box-shadow: 0 5px 22px rgba(92, 57, 32, 0.035);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  min-width: 0;
+}
+
+.loomzi-product-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 10px 28px rgba(92, 57, 32, 0.09);
+}
+
+.loomzi-product-image {
+  position: relative;
+  aspect-ratio: 0.92;
+  overflow: hidden;
+  border-radius: 13px;
+  background: #f5eae5;
+}
+
+.loomzi-product-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.loomzi-wishlist {
+  position: absolute;
+  right: 11px;
+  top: 11px;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: #fff;
+  border: none;
+  border-radius: 50%;
+  color: #e8a7bf;
+  cursor: pointer;
+}
+
+.loomzi-wishlist.active {
+  color: #e44f86;
+}
+
+.loomzi-product-info {
+  padding: 12px 6px 5px;
+}
+
+.loomzi-product-info h3 {
+  margin: 0 0 9px;
+  color: #553625;
+  font-family: Georgia, serif;
+  font-size: 19px;
+  font-weight: 400;
+  line-height: 1.3;
+}
+
+.loomzi-product-rating {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-bottom: 10px;
+}
+
+.loomzi-stars {
+  display: flex;
+  gap: 2px;
+  color: #f6bb24;
+  font-size: 11px;
+}
+
+.loomzi-review-count {
+  font-size: 10px;
+  color: #aaa;
+}
+
+.loomzi-product-bottom {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.loomzi-price {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.loomzi-price strong {
+  color: #b36a05;
+  font-size: 17px;
+}
+
+.loomzi-price del {
+  color: #c7c7c7;
+  font-size: 11px;
+}
+
+.loomzi-add-cart {
+  flex-shrink: 0;
+  width: 31px;
+  height: 31px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: #4eb4af;
+  border: none;
+  border-radius: 10px;
+  color: white;
+  cursor: pointer;
+}
+
+.loomzi-add-cart:hover {
+  background: #319994;
+}
+
+@media (max-width: 600px) {
+  .loomzi-product-info h3 {
+    font-size: 15px;
+  }
+
+  .loomzi-price strong {
+    font-size: 14px;
+  }
+}
+
+.loomzi-product-name-link {
+  color: inherit;
+  text-decoration: none;
+}
+
+.loomzi-product-name-link:hover {
+  color: #b66b08;
+}
+
+.loomzi-product-image > a {
+  display: block;
+  width: 100%;
+  height: 100%;
+}

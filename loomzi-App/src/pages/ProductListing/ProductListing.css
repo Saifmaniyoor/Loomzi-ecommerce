@@ -1,0 +1,230 @@
+
+.loomzi-listing-page {
+  min-height: 100vh;
+  background: #fffdf8;
+  padding: 30px 0 90px;
+}
+
+.loomzi-listing-container {
+  max-width: 1350px;
+  margin: 0 auto;
+  padding: 0 35px;
+}
+
+.loomzi-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 30px;
+  font-size: 12px;
+  color: #b6b6b6;
+}
+
+.loomzi-breadcrumb a {
+  color: #b6b6b6;
+  text-decoration: none;
+}
+
+.loomzi-breadcrumb span:last-child {
+  color: #ba7a2e;
+}
+
+.loomzi-listing-layout {
+  display: grid;
+  grid-template-columns: 225px minmax(0, 1fr);
+  gap: 40px;
+  align-items: start;
+}
+
+.loomzi-products-section {
+  min-width: 0;
+}
+
+.loomzi-listing-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+  margin-bottom: 23px;
+}
+
+.loomzi-listing-header h1 {
+  font-family: Georgia, serif;
+  font-size: clamp(29px, 3vw, 42px);
+  font-weight: 400;
+  color: #522d1d;
+  margin: 0 0 3px;
+}
+
+.loomzi-listing-header p {
+  margin: 0;
+  font-size: 12px;
+  color: #999;
+}
+
+.loomzi-sort-container {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  white-space: nowrap;
+}
+
+.loomzi-sort-container label {
+  color: #aaa;
+  font-size: 12px;
+}
+
+.loomzi-sort-container select {
+  padding: 11px 16px;
+  border: 1px solid #f0e9e6;
+  border-radius: 30px;
+  background: white;
+  color: #555;
+  font-size: 12px;
+  cursor: pointer;
+  outline: none;
+}
+
+.loomzi-product-search {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 18px;
+}
+
+.loomzi-product-search input {
+  width: 240px;
+  max-width: 100%;
+  padding: 11px 16px;
+  border: 1px solid #efe6e1;
+  border-radius: 30px;
+  background: white;
+  outline: none;
+  font-size: 13px;
+}
+
+.loomzi-product-search input:focus {
+  border-color: #c49b80;
+}
+
+.loomzi-products-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 24px 22px;
+}
+
+.loomzi-empty-products {
+  padding: 70px 20px;
+  text-align: center;
+  background: white;
+  border-radius: 20px;
+}
+
+.loomzi-empty-products h2 {
+  color: #593820;
+  font-family: Georgia, serif;
+  font-weight: 400;
+}
+
+.loomzi-empty-products p {
+  color: #999;
+  font-size: 14px;
+}
+
+.loomzi-pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+  margin-top: 50px;
+}
+
+.loomzi-pagination button {
+  width: 38px;
+  height: 38px;
+  border: 1px solid #f0e9e6;
+  border-radius: 50%;
+  background: white;
+  color: #555;
+  cursor: pointer;
+}
+
+.loomzi-pagination button.active {
+  background: #b86d09;
+  border-color: #b86d09;
+  color: white;
+}
+
+.loomzi-pagination button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+@media (max-width: 1100px) {
+  .loomzi-listing-layout {
+    grid-template-columns: 190px minmax(0, 1fr);
+    gap: 25px;
+  }
+
+  .loomzi-products-grid {
+    gap: 18px;
+  }
+}
+
+@media (max-width: 850px) {
+  .loomzi-listing-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .loomzi-sidebar {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 18px;
+  }
+
+  .loomzi-filter-section {
+    margin-bottom: 10px;
+  }
+
+  .loomzi-reset-filters {
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
+}
+
+@media (max-width: 600px) {
+  .loomzi-listing-container {
+    padding: 0 16px;
+  }
+
+  .loomzi-sidebar {
+    grid-template-columns: 1fr;
+  }
+
+  .loomzi-listing-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .loomzi-listing-header h1 {
+    font-size: 30px;
+  }
+
+  .loomzi-products-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .loomzi-product-search {
+    justify-content: stretch;
+  }
+
+  .loomzi-product-search input {
+    width: 100%;
+  }
+}
+
+@media (max-width: 380px) {
+  .loomzi-products-grid {
+    grid-template-columns: 1fr;
+  }
+}

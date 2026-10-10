@@ -1,0 +1,220 @@
+.editors-favorites {
+  width: 100%;
+  padding: 70px 6%;
+  background-color: #fff;
+  box-sizing: border-box;
+}
+
+/* Header */
+
+.favorites-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  margin-bottom: 35px;
+}
+
+.favorites-subtitle {
+  margin: 0 0 8px;
+  font-size: 12px;
+  letter-spacing: 2px;
+  font-weight: 600;
+  color: #9b8068;
+}
+
+.favorites-header h2 {
+  margin: 0;
+  font-size: 32px;
+  font-weight: 500;
+  color: #29231f;
+}
+
+.view-all {
+  color: #29231f;
+  text-decoration: none;
+  font-size: 14px;
+  border-bottom: 1px solid #29231f;
+  padding-bottom: 4px;
+}
+
+/* 4 Products in One Row */
+
+.favorites-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 20px;
+  width: 100%;
+}
+
+/* Product Card */
+
+.favorite-card {
+  min-width: 0;
+  cursor: pointer;
+}
+
+/* Product Image */
+
+.favorite-image {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  overflow: hidden;
+  background-color: #f5f2ef;
+}
+
+.favorite-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: transform 0.4s ease;
+}
+
+.favorite-card:hover .favorite-image img {
+  transform: scale(1.04);
+}
+
+/* Heart Button */
+
+.favorite-btn {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+
+  width: 38px;
+  height: 38px;
+
+  border: none;
+  border-radius: 50%;
+  background-color: rgba(255, 255, 255, 0.9);
+
+  font-size: 22px;
+  color: #29231f;
+
+  cursor: pointer;
+}
+
+/* Product Information */
+
+.favorite-info {
+  padding-top: 15px;
+}
+
+.favorite-info h3 {
+  margin: 0 0 7px;
+  font-size: 15px;
+  font-weight: 500;
+  color: #29231f;
+}
+
+/* Rating */
+
+.product-rating {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-bottom: 8px;
+  font-size: 12px;
+}
+
+.stars {
+  letter-spacing: 1px;
+  font-size: 13px;
+  color: #b28a55;
+}
+
+.rating-number {
+  color: #555;
+}
+
+.review-count {
+  color: #888;
+}
+
+/* Price */
+
+.product-price {
+  margin: 0;
+  font-size: 14px;
+  color: #29231f;
+  font-weight: 500;
+}
+
+
+/* =========================
+   Tablet
+========================= */
+
+@media (max-width: 900px) {
+
+  .editors-favorites {
+    padding: 55px 5%;
+  }
+
+  .favorites-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 20px;
+  }
+
+  .favorites-header h2 {
+    font-size: 28px;
+  }
+}
+
+
+/* =========================
+   Mobile
+========================= */
+
+@media (max-width: 600px) {
+
+  .editors-favorites {
+    padding: 45px 5%;
+  }
+
+  .favorites-header {
+    align-items: flex-end;
+  }
+
+  .favorites-header h2 {
+    font-size: 24px;
+  }
+
+  .favorites-subtitle {
+    font-size: 10px;
+  }
+
+  .view-all {
+    font-size: 12px;
+  }
+
+  .favorites-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 15px;
+  }
+
+  .favorite-btn {
+    width: 32px;
+    height: 32px;
+    top: 10px;
+    right: 10px;
+    font-size: 18px;
+  }
+
+  .favorite-info h3 {
+    font-size: 13px;
+  }
+
+  .product-rating {
+    font-size: 11px;
+  }
+
+  .stars {
+    font-size: 11px;
+  }
+
+  .product-price {
+    font-size: 13px;
+  }
+}

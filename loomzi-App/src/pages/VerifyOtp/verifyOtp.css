@@ -1,0 +1,173 @@
+
+.verify-page {
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: #faf7f2;
+  padding: 24px;
+  font-family: Arial, sans-serif;
+}
+
+.verify-card {
+  background: #ffffff;
+  width: 100%;
+  max-width: 460px;
+  padding: 40px 32px;
+  border-radius: 16px;
+  text-align: center;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.06);
+}
+
+.verify-logo {
+  font-size: 30px;
+  font-weight: 700;
+  color: #26221e;
+  margin-bottom: 25px;
+  letter-spacing: 1px;
+}
+
+.verify-icon {
+  width: 65px;
+  height: 65px;
+  background: #f5ead7;
+  color: #ad833b;
+  border-radius: 50%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 30px;
+  margin: 0 auto 20px;
+}
+
+.verify-card h2 {
+  font-size: 25px;
+  font-weight: 600;
+  color: #252525;
+  margin-bottom: 12px;
+}
+
+.verify-description {
+  color: #777;
+  font-size: 14px;
+  line-height: 1.6;
+  margin-bottom: 5px;
+}
+
+.verify-email {
+  font-size: 14px;
+  color: #333;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+  margin-bottom: 28px;
+}
+
+.otp-container {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 22px;
+}
+
+.otp-input {
+  width: 48px;
+  height: 54px;
+  border: 1px solid #d8d2c9;
+  border-radius: 8px;
+  text-align: center;
+  font-size: 22px;
+  font-weight: 600;
+  color: #252525;
+  outline: none;
+  transition: 0.2s;
+}
+
+.otp-input:focus {
+  border-color: #b48a47;
+  box-shadow: 0 0 0 3px rgba(180, 138, 71, 0.12);
+}
+
+.verify-button {
+  width: 100%;
+  padding: 15px;
+  background: #27221d;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.verify-button:hover:not(:disabled) {
+  background: #ad833b;
+}
+
+.verify-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.verify-error {
+  color: #c0392b;
+  font-size: 13px;
+  margin-bottom: 15px;
+}
+
+.verify-success {
+  color: #25834c;
+  font-size: 13px;
+  margin-bottom: 15px;
+}
+
+.verify-expiry {
+  color: #888;
+  font-size: 13px;
+  margin-top: 20px;
+}
+
+.verify-footer {
+  margin-top: 20px;
+  font-size: 13px;
+  color: #777;
+}
+
+.resend-placeholder {
+  color: #ad833b;
+  font-weight: 600;
+}
+
+.verify-back {
+  display: inline-block;
+  margin-top: 25px;
+  border: none;
+  background: transparent;
+  color: #777;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.verify-back:hover {
+  color: #252525;
+}
+
+@media (max-width: 480px) {
+  .verify-card {
+    padding: 30px 18px;
+  }
+
+  .otp-container {
+    gap: 6px;
+  }
+
+  .otp-input {
+    width: 40px;
+    height: 48px;
+    font-size: 19px;
+  }
+
+  .verify-card h2 {
+    font-size: 22px;
+  }
+}

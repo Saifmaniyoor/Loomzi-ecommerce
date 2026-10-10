@@ -1,0 +1,294 @@
+/* =========================
+   About Us Section
+========================= */
+
+.about-us {
+  width: 100%;
+
+  padding: 90px 60px;
+
+  box-sizing: border-box;
+
+  background-color: #faf8f4;
+}
+
+
+/* =========================
+   Heading
+========================= */
+
+.about-heading {
+  text-align: center;
+
+  max-width: 700px;
+
+  margin: 0 auto 50px;
+}
+
+.about-subtitle {
+  margin-bottom: 10px;
+
+  font-size: 12px;
+
+  font-weight: 600;
+
+  letter-spacing: 2px;
+
+  color: #b58b4c;
+}
+
+.about-heading h2 {
+  margin: 0;
+
+  font-size: 40px;
+
+  color: #2b2b2b;
+}
+
+.about-description {
+  margin-top: 15px;
+
+  font-size: 16px;
+
+  line-height: 1.6;
+
+  color: #777777;
+}
+
+
+/* =========================
+   About Steps Container
+========================= */
+
+.about-steps {
+  max-width: 1200px;
+
+  margin: 0 auto;
+
+  display: flex;
+
+  flex-direction: column;
+
+  gap: 80px;
+}
+
+
+/* =========================
+   About Step
+========================= */
+
+.about-step {
+  display: grid;
+
+  grid-template-columns: 1fr 1fr;
+
+  align-items: center;
+
+  gap: 60px;
+}
+
+
+/* =========================
+   Reverse Layout
+========================= */
+
+.about-step.reverse {
+  direction: rtl;
+}
+
+.about-step.reverse .about-content {
+  direction: ltr;
+}
+
+
+/* =========================
+   Image
+========================= */
+
+.about-image {
+  width: 100%;
+
+  height: 420px;
+
+  overflow: hidden;
+}
+
+.about-image img {
+  width: 100%;
+
+  height: 100%;
+
+  object-fit: cover;
+
+  display: block;
+
+  transition: transform 0.4s ease;
+}
+
+.about-image:hover img {
+  transform: scale(1.05);
+}
+
+
+/* =========================
+   Content
+========================= */
+
+.about-content {
+  padding: 20px 30px;
+}
+
+.about-number {
+  display: inline-block;
+
+  margin-bottom: 15px;
+
+  font-size: 14px;
+
+  font-weight: 600;
+
+  letter-spacing: 2px;
+
+  color: #b58b4c;
+}
+
+.about-content h3 {
+  margin: 0 0 15px;
+
+  font-size: 30px;
+
+  font-weight: 600;
+
+  color: #2b2b2b;
+}
+
+.about-content p {
+  margin: 0;
+
+  max-width: 500px;
+
+  font-size: 16px;
+
+  line-height: 1.7;
+
+  color: #777777;
+}
+
+
+/* =========================
+   Tablet
+========================= */
+
+@media (max-width: 900px) {
+
+  .about-us {
+    padding: 70px 30px;
+  }
+
+  .about-steps {
+    gap: 60px;
+  }
+
+  .about-step {
+    gap: 35px;
+  }
+
+  .about-image {
+    height: 350px;
+  }
+
+  .about-content {
+    padding: 10px;
+  }
+
+  .about-content h3 {
+    font-size: 26px;
+  }
+
+}
+
+
+/* =========================
+   Mobile
+========================= */
+
+@media (max-width: 600px) {
+
+  .about-us {
+    padding: 60px 20px;
+  }
+
+
+  /* Heading */
+
+  .about-heading {
+    margin-bottom: 40px;
+  }
+
+  .about-heading h2 {
+    font-size: 32px;
+  }
+
+  .about-description {
+    font-size: 15px;
+  }
+
+
+  /* Steps */
+
+  .about-steps {
+    gap: 50px;
+  }
+
+  .about-step {
+    display: flex;
+
+    flex-direction: column;
+
+    gap: 25px;
+  }
+
+
+  /* Remove Reverse Effect on Mobile */
+
+  .about-step.reverse {
+    direction: ltr;
+  }
+
+
+  /* Image */
+
+  .about-image {
+    width: 100%;
+
+    height: 300px;
+  }
+
+
+  /* Content */
+
+  .about-content {
+    width: 100%;
+
+    padding: 0;
+  }
+
+  .about-number {
+    margin-bottom: 10px;
+
+    font-size: 13px;
+  }
+
+  .about-content h3 {
+    margin-bottom: 12px;
+
+    font-size: 25px;
+  }
+
+  .about-content p {
+    font-size: 15px;
+
+    line-height: 1.6;
+  }
+
+}

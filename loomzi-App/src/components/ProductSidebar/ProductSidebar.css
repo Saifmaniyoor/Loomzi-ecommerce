@@ -1,0 +1,113 @@
+
+.loomzi-sidebar {
+  width: 100%;
+  padding-top: 5px;
+}
+
+.loomzi-filter-section {
+  margin-bottom: 34px;
+}
+
+.loomzi-filter-section h3 {
+  margin: 0 0 18px;
+  font-family: Georgia, serif;
+  font-weight: 400;
+  color: #593820;
+  font-size: 18px;
+}
+
+.loomzi-category-option {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 7px 0;
+  border: none;
+  background: transparent;
+  text-align: left;
+  font-size: 13px;
+  color: #888;
+  cursor: pointer;
+}
+
+.loomzi-category-option.selected {
+  color: #9f5b13;
+  font-weight: 600;
+}
+
+.loomzi-category-count {
+  min-width: 25px;
+  padding: 5px 7px;
+  border-radius: 50px;
+  background: #f0f1f4;
+  text-align: center;
+  font-size: 10px;
+  color: #a6a8b0;
+}
+
+.loomzi-category-option.selected .loomzi-category-count {
+  background: #fbe2ed;
+  color: #df85a5;
+}
+
+.loomzi-clear-category {
+  margin-top: 10px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: #b87730;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.loomzi-size-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.loomzi-size-button {
+  padding: 11px 5px;
+  border: 1px solid #f7f0ed;
+  border-radius: 9px;
+  background: white;
+  font-size: 11px;
+  color: #8c7b73;
+  cursor: pointer;
+}
+
+.loomzi-size-button.selected {
+  border: 1px solid #b77720;
+  background: #fbe3ed;
+  color: #a96b1c;
+}
+
+.loomzi-price-slider {
+  width: 100%;
+  accent-color: #e9abc2;
+  cursor: pointer;
+}
+
+.loomzi-price-labels {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 8px;
+}
+
+.loomzi-price-labels span {
+  background: white;
+  border-radius: 6px;
+  padding: 7px 9px;
+  color: #744a35;
+  font-size: 11px;
+}
+
+.loomzi-reset-filters {
+  border: 1px solid #e6d8cd;
+  background: transparent;
+  border-radius: 20px;
+  padding: 9px 15px;
+  color: #8c5c39;
+  font-size: 12px;
+  cursor: pointer;
+}

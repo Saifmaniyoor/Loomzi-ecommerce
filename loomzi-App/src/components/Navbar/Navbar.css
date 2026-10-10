@@ -1,0 +1,553 @@
+/* =========================
+   Navbar
+========================= */
+
+.navbar {
+  width: 100%;
+  min-height: 80px;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  padding: 0 60px;
+
+  background-color: #ffffff;
+
+  border-bottom: 1px solid #eeeeee;
+
+  box-sizing: border-box;
+
+  position: relative;
+}
+
+
+/* =========================
+   Logo
+========================= */
+
+.navbar-logo a {
+  display: flex;
+  align-items: center;
+
+  text-decoration: none;
+}
+
+.navbar-logo img {
+  display: block;
+
+  width: 200px;
+  height: auto;
+}
+
+
+/* =========================
+   Desktop Menu
+========================= */
+
+.navbar-menu {
+  display: flex;
+  align-items: center;
+
+  gap: 32px;
+}
+
+.navbar-menu a {
+  text-decoration: none;
+
+  font-size: 15px;
+  font-weight: 500;
+
+  color: #333333;
+
+  transition: color 0.3s ease;
+}
+
+.navbar-menu a:hover {
+  color: #b58b4c;
+}
+
+
+/* =========================
+   Right Side
+========================= */
+
+.navbar-actions {
+  display: flex;
+  align-items: center;
+
+  gap: 18px;
+}
+
+
+/* =========================
+   Search
+========================= */
+
+.navbar-search {
+  display: flex;
+  align-items: center;
+
+  width: 300px;
+  height: 40px;
+
+  border: 1px solid #dddddd;
+  border-radius: 30px;
+
+  overflow: hidden;
+}
+
+.navbar-search input {
+  flex: 1;
+
+  width: 100%;
+  height: 100%;
+
+  border: none;
+  outline: none;
+
+  padding: 0 12px;
+
+  font-size: 14px;
+
+  background-color: #f4f4f4;
+
+  box-sizing: border-box;
+}
+
+.navbar-search input::placeholder {
+  color: #999999;
+}
+
+.search-button {
+  width: 42px;
+  height: 100%;
+
+  border: none;
+
+  background-color: #f4f4f4;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  cursor: pointer;
+}
+
+.search-button img {
+  width: 18px;
+  height: 18px;
+
+  object-fit: contain;
+}
+
+
+/* =========================
+   Cart & Account
+========================= */
+
+.navbar-icon {
+  width: 40px;
+  height: 40px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border: none;
+  background: none;
+
+  text-decoration: none;
+
+  cursor: pointer;
+}
+
+.navbar-icon img {
+  width: 22px;
+  height: 22px;
+
+  object-fit: contain;
+
+  transition: transform 0.2s ease;
+}
+
+.navbar-icon:hover img {
+  transform: scale(1.08);
+}
+
+
+/* =========================
+   Mobile Menu Button
+========================= */
+
+.menu-button {
+  display: none;
+
+  width: 40px;
+  height: 40px;
+
+  border: none;
+  background: none;
+
+  font-size: 25px;
+
+  cursor: pointer;
+
+  color: #333333;
+}
+
+
+/* =========================
+   Mobile Menu
+========================= */
+
+.mobile-menu {
+  display: none;
+}
+
+
+/* =========================
+   Tablet / Mobile
+========================= */
+
+@media (max-width: 768px) {
+
+  .navbar {
+    min-height: 70px;
+
+    padding: 0 15px;
+  }
+
+
+  /* Hide Desktop Menu */
+
+  .navbar-menu {
+    display: none;
+  }
+
+
+  /* Logo */
+
+  .navbar-logo img {
+    width: 110px;
+  }
+
+
+  /* Right Side */
+
+  .navbar-actions {
+    display: flex;
+    align-items: center;
+
+    gap: 8px;
+  }
+
+
+  /* Search */
+
+  .navbar-search {
+    width: 150px;
+    height: 36px;
+  }
+
+  .navbar-search input {
+    font-size: 13px;
+
+    padding: 0 10px;
+  }
+
+  .search-button {
+    width: 36px;
+  }
+
+  .search-button img {
+    width: 16px;
+    height: 16px;
+  }
+
+
+  /* Cart & Account */
+
+  .navbar-icon {
+    width: 32px;
+    height: 36px;
+  }
+
+  .navbar-icon img {
+    width: 19px;
+    height: 19px;
+  }
+
+
+  /* Hamburger */
+
+  .menu-button {
+    display: flex;
+
+    align-items: center;
+    justify-content: center;
+
+    width: 32px;
+    height: 36px;
+
+    border: none;
+    background: none;
+
+    font-size: 22px;
+
+    cursor: pointer;
+
+    color: #333333;
+  }
+
+
+  /* Mobile Navigation */
+
+  .mobile-menu {
+    position: absolute;
+
+    top: 70px;
+    left: 0;
+
+    width: 100%;
+
+    display: flex;
+    flex-direction: column;
+
+    background-color: #ffffff;
+
+    border-top: 1px solid #eeeeee;
+    border-bottom: 1px solid #eeeeee;
+
+    z-index: 1000;
+  }
+
+  .mobile-menu a {
+    padding: 15px 20px;
+
+    text-decoration: none;
+
+    font-size: 16px;
+
+    color: #333333;
+
+    border-bottom: 1px solid #eeeeee;
+  }
+
+  .mobile-menu a:hover {
+    background-color: #fafafa;
+
+    color: #b58b4c;
+  }
+
+}
+
+
+/* =========================
+   Small Mobile
+========================= */
+
+@media (max-width: 480px) {
+
+  .navbar {
+    padding: 0 10px;
+  }
+
+
+  /* Logo */
+
+  .navbar-logo img {
+    width: 90px;
+  }
+
+
+  /* Right Side */
+
+  .navbar-actions {
+    gap: 5px;
+  }
+
+
+  /* Search */
+
+  .navbar-search {
+    width: 120px;
+    height: 34px;
+  }
+
+  .navbar-search input {
+    font-size: 12px;
+
+    padding: 0 8px;
+  }
+
+  .search-button {
+    width: 32px;
+  }
+
+  .search-button img {
+    width: 15px;
+    height: 15px;
+  }
+
+
+  /* Cart & Account */
+
+  .navbar-icon {
+    width: 28px;
+    height: 34px;
+  }
+
+  .navbar-icon img {
+    width: 18px;
+    height: 18px;
+  }
+
+
+  /* Hamburger */
+
+  .menu-button {
+    width: 28px;
+    height: 34px;
+
+    font-size: 20px;
+  }
+
+}
+
+
+/* Account icon with username */
+.navbar-account {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+/* Logged-in username */
+.navbar-username {
+  font-size: 14px;
+  font-weight: 500;
+  color: #333;
+}
+
+/* Small screens */
+@media (max-width: 768px) {
+  .navbar-username {
+    font-size: 12px;
+    max-width: 90px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+
+
+/* Account dropdown wrapper */
+.navbar-account-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+/* Account button */
+.navbar-account {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+}
+
+.navbar-username {
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.account-arrow {
+  font-size: 13px;
+}
+
+/* Dropdown menu */
+.account-dropdown {
+  position: absolute;
+  top: calc(100% + 12px);
+  right: 0;
+  width: 230px;
+  padding: 10px 0;
+  background: #ffffff;
+  border: 1px solid #eeeeee;
+  border-radius: 10px;
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.12);
+  z-index: 1000;
+}
+
+/* Logged-in user details */
+.dropdown-user {
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.dropdown-user strong {
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+
+.dropdown-user small {
+  color: #777;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.dropdown-divider {
+  height: 1px;
+  background: #eeeeee;
+  margin: 6px 0;
+}
+
+/* Dropdown links/buttons */
+.dropdown-item {
+  display: block;
+  width: 100%;
+  padding: 11px 16px;
+  border: none;
+  background: transparent;
+  text-align: left;
+  font-size: 13px;
+  color: #333;
+  cursor: pointer;
+}
+
+.dropdown-item:hover:not(:disabled) {
+  background: #f7f7f7;
+}
+
+.dropdown-item:disabled {
+  color: #999;
+  cursor: not-allowed;
+}
+
+.dropdown-logout {
+  color: #c0392b;
+  font-weight: 600;
+}
+
+/* Mobile adjustments */
+@media (max-width: 768px) {
+  .navbar-username {
+    max-width: 90px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .account-dropdown {
+    width: 210px;
+    max-width: calc(100vw - 20px);
+  }
+}
