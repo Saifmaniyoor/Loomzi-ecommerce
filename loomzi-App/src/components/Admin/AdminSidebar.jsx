@@ -1,3 +1,4 @@
+import { NavLink } from "react-router-dom"; 
 
 import {
   LayoutDashboard,
@@ -8,7 +9,6 @@ import {
   LogOut,
   Store,
 } from "lucide-react";
-import { NavLink } from "react-router-dom";
 
 function AdminSidebar({ onLogout, loggingOut }) {
   const menuItems = [

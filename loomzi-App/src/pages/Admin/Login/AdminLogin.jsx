@@ -2,10 +2,12 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { FaEnvelope, FaLock, FaEye, FaEyeSlash } from "react-icons/fa";
+import { useAdminAuth } from "../../../Context/AdminAuthContext";
 import "./AdminLogin.css";
 
 function AdminLogin() {
   const navigate = useNavigate();
+  const { checkAdmin } = useAdminAuth();
 
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
@@ -14,39 +16,51 @@ function AdminLogin() {
   const [loading, setLoading] = useState(false);
 
   const handleLogin = async (e) => {
-    e.preventDefault();
-    setError("");
-    setLoading(true);
+  e.preventDefault();
 
-    try {
-      const response = await fetch(
-        "http://localhost:5000/api/admin/login",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          credentials: "include",
-          body: JSON.stringify({
-            identifier: identifier.trim(),
-            password,
-          }),
-        }
-      );
+  setError("");
+  setLoading(true);
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || "Login failed");
+  try {
+    const response = await fetch(
+      "http://localhost:5000/api/admin/login",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+        body: JSON.stringify({
+          identifier: identifier.trim(),
+          password,
+        }),
       }
+    );
 
-      navigate("/admin/dashboard", { replace: true });
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.message || "Login failed");
     }
-  };
+
+    // Verify session and update AdminAuthContext
+    const verified = await checkAdmin();
+
+    if (!verified) {
+      throw new Error(
+        "Login succeeded, but admin session verification failed."
+      );
+    }
+
+    // Navigate only after admin state is updated
+    navigate("/admin/dashboard", { replace: true });
+
+  } catch (err) {
+    setError(err.message || "Something went wrong");
+  } finally {
+    setLoading(false);
+  }
+};
 
   return (
     <main className="admin-login-page">

@@ -1,5 +1,4 @@
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft } from "lucide-react";
 
 import { useEffect, useState } from "react";
 import "./CustomerManagement.css";
@@ -15,7 +14,6 @@ function CustomerManagement() {
   const [loading, setLoading] = useState(false);
   const [updatingId, setUpdatingId] = useState(null);
   const [error, setError] = useState("");
-  const navigate = useNavigate();
 
   const limit = 10;
 
@@ -106,14 +104,6 @@ function CustomerManagement() {
 
   return (
     <div className="customer-management">
-      <button
-        className="back-dashboard-btn"
-        onClick={() => navigate("/admin/dashboard")}
-      >
-        <ArrowLeft size={18} />
-        Back to Dashboard
-      </button>
-
       <div className="customer-heading">
         <div>
           <h1>Customer Management</h1>

@@ -11,8 +11,6 @@ import {
   MoreHorizontal,
 } from "lucide-react";
 
-import AdminSidebar from "../../../components/Admin/AdminSidebar";
-import AdminHeader from "../../../components/Admin/AdminHeader";
 import SalesChart from "../../../components/Admin/SalesChart";
 import "./AdminDashboard.css";
 
@@ -178,13 +176,9 @@ function AdminDashboard() {
 
   return (
     <div className="loomzi-dashboard-layout">
-      <AdminSidebar
-        onLogout={handleLogout}
-        loggingOut={loggingOut}
-      />
+     
 
       <div className="loomzi-dashboard-workspace">
-        <AdminHeader admin={admin} />
 
         <main className="loomzi-dashboard-content">
           <div className="loomzi-dashboard-title-row">
