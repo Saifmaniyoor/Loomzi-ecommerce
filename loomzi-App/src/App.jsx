@@ -25,6 +25,10 @@ import CustomerManagement from "./pages/Admin/Customers/CustomerManagement";
 import AdminLayout from "./components/AdminLayouts/AdminLayout";
 import ProtectedAdminRoute from "./components/Admin/ProtectedAdminRoute";
 
+// Catagory Management
+import CategoryManagement from "./pages/Admin/Categories/CategoryManagement";
+
+
 import "./App.css";
 
 function App() {
@@ -58,6 +62,7 @@ function App() {
         <Route path="/admin" element={<AdminLayout />}>
           <Route path="dashboard" element={<AdminDashboard />} />
           <Route path="customers" element={<CustomerManagement />} />
+          <Route path="categories" element={<CategoryManagement />} />
         </Route>
       </Route>
     </Routes>

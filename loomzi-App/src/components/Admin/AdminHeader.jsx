@@ -1,3 +1,5 @@
+//CSS file location - admin layout -- admin layout.css
+
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Search, UserCircle, LogOut } from "lucide-react";

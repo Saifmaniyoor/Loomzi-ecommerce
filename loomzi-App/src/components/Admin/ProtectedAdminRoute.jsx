@@ -1,3 +1,5 @@
+//CSS file location - admin layout -- admin layout.css
+
 import { Navigate, Outlet } from "react-router-dom";
 import { useAdminAuth } from "../../Context/AdminAuthContext";
 

@@ -1,8 +1,7 @@
 # Loomzi
 
 Loomzi is a full-stack e-commerce application with a React/Vite frontend and an
-Express/MongoDB backend. It uses Node.js and npm; it does not require a Python
-virtual environment or a Python `requirements.txt`.
+Express/MongoDB backend. It uses Node.js and npm.
 
 ## Prerequisites
 

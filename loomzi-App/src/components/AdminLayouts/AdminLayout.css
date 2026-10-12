@@ -49,3 +49,33 @@
   color: #dc2626;
   font-size: 12px;
 }
+
+/* Product Management dropdown button */
+.loomzi-sidebar-toggle {
+  width: 100%;
+  border: none;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+/* Dropdown arrow */
+.loomzi-sidebar-chevron {
+  margin-left: auto;
+}
+
+/* Product submenu */
+.loomzi-sidebar-submenu {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-left: 18px;
+  padding-left: 12px;
+  border-left: 1px solid #e5ded8;
+}
+
+/* Submenu links */
+.loomzi-sidebar-sublink {
+  font-size: 13px;
+  padding: 10px 12px;
+}

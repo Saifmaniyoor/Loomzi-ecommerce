@@ -11,6 +11,8 @@ const { MongoStore } = require("connect-mongo");
 const connectDB = require("./config/db");
 const authRoutes = require("./routes/authRoutes");
 
+const categoryRoutes = require("./routes/categoryRoutes");
+
 const app = express();
 
 // ===============================
@@ -18,7 +20,7 @@ const app = express();
 // ===============================
 app.use(
   cors({
-    origin: "http://localhost:5177",
+    origin: "http://localhost:5174",
     credentials: true,
   })
 );
@@ -73,7 +75,7 @@ app.use("/api/admin", adminRoutes);
 // 6. API Routes
 // ===============================
 app.use("/api/auth", authRoutes);
-
+app.use("/api/admin/categories", categoryRoutes);
 // ===============================
 // 7. Test Route
 // ===============================
