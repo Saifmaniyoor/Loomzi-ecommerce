@@ -1,159 +1,531 @@
 
-import { useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { Link, useParams, useNavigate } from "react-router-dom";
+
 import {
   FaHeart,
   FaMinus,
   FaPlus,
-  FaStar,
   FaLeaf,
   FaCheck,
 } from "react-icons/fa";
 
-import products from "../../data/products";
 import ProductCard from "../../components/ProductCard/ProductCard";
+import { addToCart } from "../../services/cartApi";
+
+import {
+  getWishlist,
+  addToWishlist,
+  removeFromWishlist,
+} from "../../services/wishlistApi";
+
 import "./ProductDetails.css";
+
+const API_URL = "http://localhost:5000";
 
 const tabs = ["Description", "Size Guide", "Reviews"];
 
 function ProductDetails() {
   const { id } = useParams();
+  const navigate = useNavigate();
 
-  const product = products.find(
-    (item) => String(item.id) === id
-  );
+  // ===============================
+  // Product States
+  // ===============================
+  const [product, setProduct] = useState(null);
+  const [relatedProducts, setRelatedProducts] = useState([]);
+
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   const [activeImage, setActiveImage] = useState(0);
   const [selectedSize, setSelectedSize] = useState("");
-  const [selectedColor, setSelectedColor] = useState("Red");
+  const [selectedColor, setSelectedColor] = useState("");
   const [quantity, setQuantity] = useState(1);
-  const [favorite, setFavorite] = useState(false);
+
   const [activeTab, setActiveTab] = useState("Description");
 
-  useEffect(() => {
-    setActiveImage(0);
-    setSelectedSize(product?.sizes?.[0] || "");
-    setSelectedColor(product?.colors?.[0] || "Red");
-    setQuantity(1);
-    setFavorite(false);
-    setActiveTab("Description");
-  }, [id, product]);
+  // ===============================
+  // Wishlist States
+  // ===============================
+  const [favorite, setFavorite] = useState(false);
+  const [wishlistLoading, setWishlistLoading] = useState(false);
+  const [wishlistError, setWishlistError] = useState("");
 
-  if (!product) {
+  // ===============================
+  // Cart States
+  // ===============================
+  const [addingToCart, setAddingToCart] = useState(false);
+  const [cartError, setCartError] = useState("");
+
+  // ===============================
+  // 1. Fetch Product Details
+  // ===============================
+  useEffect(() => {
+    const controller = new AbortController();
+
+    async function fetchProductDetails() {
+      try {
+        setLoading(true);
+        setError("");
+        setProduct(null);
+        setRelatedProducts([]);
+
+        const response = await fetch(
+          `${API_URL}/api/products/${id}`,
+          { signal: controller.signal }
+        );
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(
+            data.message || "Failed to load product details"
+          );
+        }
+
+        const fetchedProduct = data.product;
+
+        setProduct(fetchedProduct);
+
+        // Reset selections for new product
+        setActiveImage(0);
+        setSelectedSize("");
+        setSelectedColor("");
+        setQuantity(1);
+        setFavorite(false);
+        setActiveTab("Description");
+        setCartError("");
+        setWishlistError("");
+
+        // Fetch related products
+        const relatedResponse = await fetch(
+          `${API_URL}/api/products?page=1&limit=20`,
+          { signal: controller.signal }
+        );
+
+        if (relatedResponse.ok) {
+          const relatedData = await relatedResponse.json();
+
+          const related = (relatedData.products || [])
+            .filter(
+              (item) =>
+                item._id !== fetchedProduct._id &&
+                item.category?._id ===
+                  fetchedProduct.category?._id
+            )
+            .slice(0, 4);
+
+          setRelatedProducts(related);
+        }
+      } catch (err) {
+        if (err.name !== "AbortError") {
+          setError(err.message || "Something went wrong");
+        }
+      } finally {
+        if (!controller.signal.aborted) {
+          setLoading(false);
+        }
+      }
+    }
+
+    fetchProductDetails();
+
+    return () => controller.abort();
+  }, [id]);
+
+  // ===============================
+  // 2. Check Wishlist Status
+  // ===============================
+  useEffect(() => {
+    if (!id) return;
+
+    let active = true;
+
+    // Reset status while switching products
+    setFavorite(false);
+    setWishlistError("");
+
+    const checkWishlist = async () => {
+      try {
+        const data = await getWishlist();
+
+        if (!active) return;
+
+        const exists = (data.products || []).some(
+          (item) => item._id === id
+        );
+
+        setFavorite(exists);
+      } catch (err) {
+        if (!active) return;
+
+        if (err.status === 401) {
+          setFavorite(false);
+        } else {
+          console.error("Wishlist check error:", err);
+        }
+      }
+    };
+
+    checkWishlist();
+
+    // Synchronize wishlist with ProductCard
+    window.addEventListener(
+      "loomzi:wishlist-updated",
+      checkWishlist
+    );
+
+    return () => {
+      active = false;
+
+      window.removeEventListener(
+        "loomzi:wishlist-updated",
+        checkWishlist
+      );
+    };
+  }, [id]);
+
+  // ===============================
+  // 3. Add / Remove Wishlist
+  // ===============================
+  const handleWishlist = async () => {
+    if (!product || wishlistLoading) return;
+
+    try {
+      setWishlistLoading(true);
+      setWishlistError("");
+
+      if (favorite) {
+        await removeFromWishlist(product._id);
+        setFavorite(false);
+      } else {
+        await addToWishlist(product._id);
+        setFavorite(true);
+      }
+
+      // Notify other wishlist components
+      window.dispatchEvent(
+        new Event("loomzi:wishlist-updated")
+      );
+    } catch (err) {
+      if (err.status === 401) {
+        navigate("/login");
+        return;
+      }
+
+      setWishlistError(
+        err.message || "Failed to update wishlist"
+      );
+    } finally {
+      setWishlistLoading(false);
+    }
+  };
+
+  // ===============================
+  // 4. Product Variants
+  // ===============================
+  const variants = product?.variants || [];
+  const hasVariants = variants.length > 0;
+
+  // Available colors
+  const colors = useMemo(() => {
+    return [
+      ...new Set(
+        variants
+          .map((variant) => variant.color)
+          .filter(Boolean)
+      ),
+    ];
+  }, [variants]);
+
+  // Available sizes
+  const sizes = useMemo(() => {
+    const matchingVariants = selectedColor
+      ? variants.filter(
+          (variant) => variant.color === selectedColor
+        )
+      : variants;
+
+    return [
+      ...new Set(
+        matchingVariants
+          .map((variant) => variant.size)
+          .filter(Boolean)
+      ),
+    ];
+  }, [variants, selectedColor]);
+
+  // Find selected variant
+  const selectedVariant = useMemo(() => {
+    if (!hasVariants) return null;
+
+    return (
+      variants.find((variant) => {
+        const colorMatches =
+          !variant.color ||
+          variant.color === selectedColor;
+
+        const sizeMatches =
+          !variant.size ||
+          variant.size === selectedSize;
+
+        return colorMatches && sizeMatches;
+      }) || null
+    );
+  }, [
+    variants,
+    hasVariants,
+    selectedColor,
+    selectedSize,
+  ]);
+
+  // ===============================
+  // 5. Price and Stock
+  // ===============================
+  const displayPrice =
+    selectedVariant?.price != null
+      ? Number(selectedVariant.price)
+      : Number(product?.price || 0);
+
+  const availableStock = hasVariants
+    ? Number(selectedVariant?.stock || 0)
+    : Number(product?.stock || 0);
+
+  const optionsSelected =
+    !hasVariants || Boolean(selectedVariant);
+
+  const isOutOfStock =
+    optionsSelected && availableStock <= 0;
+
+  const canAddToCart =
+    optionsSelected &&
+    availableStock > 0 &&
+    quantity <= availableStock;
+
+  // ===============================
+  // 6. Product Images
+  // ===============================
+  const images = product?.images || [];
+
+  const handleColorChange = (color) => {
+    setSelectedColor(color);
+    setSelectedSize("");
+    setQuantity(1);
+    setCartError("");
+  };
+
+  const handleSizeChange = (size) => {
+    setSelectedSize(size);
+    setQuantity(1);
+    setCartError("");
+  };
+
+  // ===============================
+  // 7. Add to Cart - Real API
+  // ===============================
+  const handleAddToCart = async () => {
+    if (!canAddToCart || addingToCart || !product) {
+      return;
+    }
+
+    try {
+      setAddingToCart(true);
+      setCartError("");
+
+      const variantId = hasVariants
+        ? selectedVariant?._id
+        : null;
+
+      await addToCart(
+        product._id,
+        variantId,
+        quantity
+      );
+
+      // Notify Navbar to refresh cart count
+      window.dispatchEvent(
+        new Event("loomzi:cart-updated")
+      );
+
+      // Redirect to Cart page
+      navigate("/cart");
+    } catch (err) {
+      if (
+        err.status === 401 ||
+        err.message === "Please login first" ||
+        err.message ===
+          "User not found. Please login again"
+      ) {
+        navigate("/login");
+        return;
+      }
+
+      setCartError(
+        err.message || "Failed to add product to cart"
+      );
+    } finally {
+      setAddingToCart(false);
+    }
+  };
+
+  // ===============================
+  // 8. Loading / Error
+  // ===============================
+  if (loading) {
     return (
       <main className="pd-not-found">
-        <h1>Product not found</h1>
-        <Link to="/products">Back to Collection</Link>
+        <h2>Loading product details...</h2>
       </main>
     );
   }
 
-  const images =
-    product.images?.length > 0
-      ? product.images
-      : [product.image];
-
-  const colors = product.colors || ["Red", "Green", "Blue"];
-
-  const relatedProducts = products
-    .filter(
-      (item) =>
-        item.id !== product.id &&
-        item.category === product.category
-    )
-    .slice(0, 4);
-
-  const handleAddToCart = () => {
-    // Connect to Cart API in the next module.
-    alert(
-      `${product.name}\nSize: ${selectedSize || "Standard"}\nColor: ${selectedColor}\nQuantity: ${quantity}`
+  if (error || !product) {
+    return (
+      <main className="pd-not-found">
+        <h1>Product unavailable</h1>
+        <p>{error || "Product not found"}</p>
+        <Link to="/products">
+          Back to Collection
+        </Link>
+      </main>
     );
-  };
+  }
 
+  // ===============================
+  // 9. Product Details UI
+  // ===============================
   return (
     <main className="pd-page">
       <div className="pd-container">
+
+        {/* Breadcrumb */}
         <nav className="pd-breadcrumb">
           <Link to="/">Home</Link>
           <span>›</span>
+
           <Link
             to={`/products?category=${encodeURIComponent(
-              product.category
+              product.category?.name || "All"
             )}`}
           >
-            {product.category}
+            {product.category?.name || "Collection"}
           </Link>
+
           <span>›</span>
           <span>{product.name}</span>
         </nav>
 
         <div className="pd-main">
-          {/* Product images */}
+
+          {/* Product Gallery */}
           <div className="pd-gallery">
             <div className="pd-main-image">
-              <img
-                src={images[activeImage]}
-                alt={product.name}
-              />
+              {images.length > 0 ? (
+                <img
+                  src={images[activeImage]}
+                  alt={product.name}
+                />
+              ) : (
+                <div className="pd-no-image">
+                  No Image Available
+                </div>
+              )}
             </div>
 
-            <div className="pd-thumbnails">
-              {images.map((image, index) => (
-                <button
-                  type="button"
-                  key={`${image}-${index}`}
-                  className={`pd-thumbnail ${
-                    activeImage === index ? "active" : ""
-                  }`}
-                  onClick={() => setActiveImage(index)}
-                  aria-label={`View product image ${index + 1}`}
-                >
-                  <img
-                    src={image}
-                    alt={`${product.name} view ${index + 1}`}
-                  />
-                </button>
-              ))}
-            </div>
+            {images.length > 1 && (
+              <div className="pd-thumbnails">
+                {images.map((image, index) => (
+                  <button
+                    type="button"
+                    key={`${image}-${index}`}
+                    className={`pd-thumbnail ${
+                      activeImage === index
+                        ? "active"
+                        : ""
+                    }`}
+                    onClick={() =>
+                      setActiveImage(index)
+                    }
+                    aria-label={`View product image ${
+                      index + 1
+                    }`}
+                  >
+                    <img
+                      src={image}
+                      alt={`${product.name} view ${
+                        index + 1
+                      }`}
+                    />
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
-          {/* Product information */}
+          {/* Product Information */}
           <div className="pd-information">
             <h1>{product.name}</h1>
 
             <div className="pd-price-rating">
-              <strong>₹{product.price.toFixed(2)}</strong>
-
-              <div className="pd-rating">
-                <span className="pd-stars">
-                  {Array.from({ length: 5 }, (_, i) => (
-                    <FaStar key={i} />
-                  ))}
-                </span>
-                <span>
-                  {product.rating} ({product.reviews} reviews)
-                </span>
-              </div>
+              <strong>
+                ₹
+                {displayPrice.toLocaleString("en-IN", {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}
+              </strong>
             </div>
 
             <p className="pd-intro">
               {product.description ||
-                "A beautiful handmade creation, carefully designed with comfort and quality in mind. Every piece is crafted with love for your little one."}
+                "A beautiful handmade creation by Loomzi."}
             </p>
 
-            {product.sizes?.length > 0 && (
+            {/* Color Selection */}
+            {colors.length > 0 && (
+              <div className="pd-option-group">
+                <h3>Select Color</h3>
+
+                <div className="pd-options">
+                  {colors.map((color) => (
+                    <button
+                      type="button"
+                      key={color}
+                      className={
+                        selectedColor === color
+                          ? "selected"
+                          : ""
+                      }
+                      onClick={() =>
+                        handleColorChange(color)
+                      }
+                    >
+                      {color}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Size Selection */}
+            {sizes.length > 0 && (
               <div className="pd-option-group">
                 <h3>Select Size</h3>
 
                 <div className="pd-options">
-                  {product.sizes.map((size) => (
+                  {sizes.map((size) => (
                     <button
                       type="button"
                       key={size}
                       className={
-                        selectedSize === size ? "selected" : ""
+                        selectedSize === size
+                          ? "selected"
+                          : ""
                       }
-                      onClick={() => setSelectedSize(size)}
+                      onClick={() =>
+                        handleSizeChange(size)
+                      }
                     >
                       {size}
                     </button>
@@ -162,31 +534,27 @@ function ProductDetails() {
               </div>
             )}
 
-            <div className="pd-option-group">
-              <h3>Select Color</h3>
+            {/* Stock Status */}
+            <p className="pd-stock-status">
+              {!optionsSelected
+                ? "Please select the available options"
+                : isOutOfStock
+                  ? "Out of Stock"
+                  : `${availableStock} items available`}
+            </p>
 
-              <div className="pd-options">
-                {colors.map((color) => (
-                  <button
-                    type="button"
-                    key={color}
-                    className={
-                      selectedColor === color ? "selected" : ""
-                    }
-                    onClick={() => setSelectedColor(color)}
-                  >
-                    {color}
-                  </button>
-                ))}
-              </div>
-            </div>
-
+            {/* Quantity and Add to Cart */}
             <div className="pd-purchase-row">
               <div className="pd-quantity">
                 <button
                   type="button"
+                  disabled={
+                    addingToCart || quantity <= 1
+                  }
                   onClick={() =>
-                    setQuantity((q) => Math.max(1, q - 1))
+                    setQuantity((q) =>
+                      Math.max(1, q - 1)
+                    )
                   }
                   aria-label="Decrease quantity"
                 >
@@ -197,7 +565,19 @@ function ProductDetails() {
 
                 <button
                   type="button"
-                  onClick={() => setQuantity((q) => q + 1)}
+                  disabled={
+                    addingToCart ||
+                    !canAddToCart ||
+                    quantity >= availableStock
+                  }
+                  onClick={() =>
+                    setQuantity((q) =>
+                      Math.min(
+                        availableStock,
+                        q + 1
+                      )
+                    )
+                  }
                   aria-label="Increase quantity"
                 >
                   <FaPlus />
@@ -207,39 +587,83 @@ function ProductDetails() {
               <button
                 type="button"
                 className="pd-add-to-cart"
+                disabled={
+                  !canAddToCart || addingToCart
+                }
                 onClick={handleAddToCart}
               >
-                Add to Cart
+                {addingToCart
+                  ? "Adding..."
+                  : isOutOfStock
+                    ? "Out of Stock"
+                    : "Add to Cart"}
               </button>
 
+              {/* Wishlist Heart Button */}
               <button
                 type="button"
-                className={`pd-favorite ${favorite ? "active" : ""}`}
-                onClick={() => setFavorite(!favorite)}
-                aria-label="Toggle wishlist"
+                className={`pd-favorite ${
+                  favorite ? "active" : ""
+                }`}
+                onClick={handleWishlist}
+                disabled={wishlistLoading}
+                aria-label={
+                  favorite
+                    ? "Remove from wishlist"
+                    : "Add to wishlist"
+                }
                 aria-pressed={favorite}
               >
                 <FaHeart />
               </button>
             </div>
+
+            {/* Cart Error */}
+            {cartError && (
+              <p
+                className="pd-cart-error"
+                role="alert"
+              >
+                {cartError}
+              </p>
+            )}
+
+            {/* Wishlist Error */}
+            {wishlistError && (
+              <p
+                className="pd-cart-error"
+                role="alert"
+              >
+                {wishlistError}
+              </p>
+            )}
           </div>
         </div>
 
-        {/* Tabs */}
+        {/* Product Details Tabs */}
         <section className="pd-details-section">
-          <div className="pd-tabs" role="tablist">
+          <div
+            className="pd-tabs"
+            role="tablist"
+          >
             {tabs.map((tab) => (
               <button
                 key={tab}
                 type="button"
                 role="tab"
-                aria-selected={activeTab === tab}
-                className={activeTab === tab ? "active" : ""}
-                onClick={() => setActiveTab(tab)}
+                aria-selected={
+                  activeTab === tab
+                }
+                className={
+                  activeTab === tab
+                    ? "active"
+                    : ""
+                }
+                onClick={() =>
+                  setActiveTab(tab)
+                }
               >
-                {tab === "Reviews"
-                  ? `Reviews (${product.reviews})`
-                  : tab}
+                {tab}
               </button>
             ))}
           </div>
@@ -247,15 +671,21 @@ function ProductDetails() {
           {activeTab === "Description" && (
             <div className="pd-description-content">
               <div>
-                <p>
-                  {product.longDescription ||
-                    "Designed for joyful days and memorable moments. Each Loomzi piece combines thoughtful craftsmanship with comfortable fabrics and beautiful handmade details."}
-                </p>
+                <p>{product.description}</p>
 
                 <ul className="pd-highlights">
-                  <li><FaCheck /> Carefully selected materials</li>
-                  <li><FaCheck /> Beautiful handmade details</li>
-                  <li><FaCheck /> Designed for everyday comfort</li>
+                  <li>
+                    <FaCheck />
+                    Carefully selected materials
+                  </li>
+                  <li>
+                    <FaCheck />
+                    Beautiful handmade details
+                  </li>
+                  <li>
+                    <FaCheck />
+                    Designed for everyday comfort
+                  </li>
                 </ul>
               </div>
 
@@ -267,8 +697,9 @@ function ProductDetails() {
                 <div>
                   <h3>Made with Care</h3>
                   <p>
-                    Discover thoughtfully crafted products
-                    made with attention to detail.
+                    Discover thoughtfully crafted
+                    products made with attention
+                    to detail.
                   </p>
                 </div>
               </div>
@@ -279,8 +710,9 @@ function ProductDetails() {
             <div className="pd-tab-panel">
               <h3>Size Guide</h3>
               <p>
-                Sizes are sample options. Exact measurements
-                will be added when product data is available.
+                Please select your preferred size.
+                Detailed measurements will be
+                added soon.
               </p>
             </div>
           )}
@@ -289,29 +721,35 @@ function ProductDetails() {
             <div className="pd-tab-panel">
               <h3>Customer Reviews</h3>
               <p>
-                Customer reviews will appear here once
-                the reviews module is connected.
+                Customer reviews will appear here
+                once the reviews module is
+                implemented.
               </p>
             </div>
           )}
         </section>
 
-        {/* Related products */}
-        <section className="pd-related">
-          <div className="pd-related-heading">
-            <h2>You May Also Love</h2>
+        {/* Related Products */}
+        {relatedProducts.length > 0 && (
+          <section className="pd-related">
+            <div className="pd-related-heading">
+              <h2>You May Also Love</h2>
 
-            <Link to="/products">
-              View All Collection →
-            </Link>
-          </div>
+              <Link to="/products">
+                View All Collection →
+              </Link>
+            </div>
 
-          <div className="pd-related-grid">
-            {relatedProducts.map((item) => (
-              <ProductCard key={item.id} product={item} />
-            ))}
-          </div>
-        </section>
+            <div className="pd-related-grid">
+              {relatedProducts.map((item) => (
+                <ProductCard
+                  key={item._id}
+                  product={item}
+                />
+              ))}
+            </div>
+          </section>
+        )}
       </div>
     </main>
   );

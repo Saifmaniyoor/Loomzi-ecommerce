@@ -233,11 +233,12 @@
 }
 
 .pd-favorite.active {
-  color: #df477f;
+  color: #e04464;
 }
 
-.pd-details-section {
-  margin-top: 75px;
+.pd-favorite:disabled {
+  opacity: 0.6;
+  cursor: wait;
 }
 
 .pd-tabs {
@@ -453,4 +454,32 @@
     align-items: flex-start;
     flex-direction: column;
   }
+}
+
+.pd-no-image {
+  width: 100%;
+  min-height: 400px;
+  background: #f5f2ef;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #8a817b;
+}
+
+.pd-stock-status {
+  margin: 16px 0;
+  font-size: 14px;
+  color: #655b54;
+}
+
+.pd-add-to-cart:disabled,
+.pd-quantity button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.pd-cart-error {
+  color: #b34f49;
+  font-size: 13px;
+  margin-top: 12px;
 }

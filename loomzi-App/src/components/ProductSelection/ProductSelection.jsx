@@ -1,114 +1,109 @@
+
+import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import "./ProductSelection.css";
 
-import dress1 from "./images/favorite-dress-1.jpg";
-import dress2 from "./images/favorite-dress-2.jpg";
-import hairband from "./images/favorite-hairband.jpg";
-import dress3 from "./images/favorite-dress-3.jpg";
-
-const favorites = [
-  {
-    id: 1,
-    name: "Floral Party Dress",
-    price: "₹1,499",
-    rating: 5,
-    reviews: 24,
-    image: dress1,
-  },
-  {
-    id: 2,
-    name: "Pink Cotton Frock",
-    price: "₹1,299",
-    rating: 4.8,
-    reviews: 18,
-    image: dress2,
-  },
-  {
-    id: 3,
-    name: "Handmade Hairband",
-    price: "₹399",
-    rating: 5,
-    reviews: 32,
-    image: hairband,
-  },
-  {
-    id: 4,
-    name: "Embroidered Kids Dress",
-    price: "₹1,699",
-    rating: 4.9,
-    reviews: 21,
-    image: dress3,
-  },
-];
+const API_URL = "http://localhost:5000";
 
 function ProductSelection() {
+  const [favorites, setFavorites] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    const fetchProducts = async () => {
+      try {
+        const response = await fetch(
+          `${API_URL}/api/products?page=1&limit=4`,
+          { signal: controller.signal }
+        );
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.message || "Failed to load products");
+        }
+
+        setFavorites(data.products || []);
+      } catch (err) {
+        if (err.name !== "AbortError") {
+          setError(err.message);
+        }
+      } finally {
+        if (!controller.signal.aborted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    fetchProducts();
+
+    return () => controller.abort();
+  }, []);
+
   return (
     <section className="editors-favorites">
-
       <div className="favorites-header">
         <div>
           <p className="favorites-subtitle">CURATED FOR YOU</p>
           <h2>Editor's Favorites</h2>
         </div>
 
-        <a href="/products" className="view-all">
+        <Link to="/products" className="view-all">
           View All
-        </a>
+        </Link>
       </div>
 
-      <div className="favorites-grid">
+      {loading && <p>Loading products...</p>}
 
-        {favorites.map((product) => (
+      {error && <p>{error}</p>}
 
-          <div className="favorite-card" key={product.id}>
+      {!loading && !error && favorites.length === 0 && (
+        <p>No products available yet.</p>
+      )}
 
-            {/* Product Image */}
-            <div className="favorite-image">
-
-              <img
-                src={product.image}
-                alt={product.name}
-              />
-
-              <button
-                className="favorite-btn"
-                aria-label="Add to favorites"
-              >
-                ♡
-              </button>
-
-            </div>
-
-            {/* Product Details */}
-            <div className="favorite-info">
-
-              <h3>{product.name}</h3>
-
-              {/* Rating */}
-              <div className="product-rating">
-                <span className="stars">★★★★★</span>
-
-                <span className="rating-number">
-                  {product.rating}
-                </span>
-
-                <span className="review-count">
-                  ({product.reviews})
-                </span>
+      {!loading && !error && (
+        <div className="favorites-grid">
+          {favorites.map((product) => (
+            <div className="favorite-card" key={product._id}>
+              <div className="favorite-image">
+                <Link to={`/products/${product._id}`}>
+                  {product.images?.[0] ? (
+                    <img
+                      src={product.images[0]}
+                      alt={product.name}
+                      loading="lazy"
+                    />
+                  ) : (
+                    <div className="product-image-placeholder">
+                      No Image
+                    </div>
+                  )}
+                </Link>
               </div>
 
-              {/* Price */}
-              <p className="product-price">
-                {product.price}
-              </p>
+              <div className="favorite-info">
+                <Link
+                  to={`/products/${product._id}`}
+                  className="favorite-product-link"
+                >
+                  <h3>{product.name}</h3>
+                </Link>
 
+                <p className="product-category">
+                  {product.category?.name}
+                </p>
+
+                <p className="product-price">
+                  ₹{Number(product.price).toLocaleString("en-IN")}
+                </p>
+              </div>
             </div>
-
-          </div>
-
-        ))}
-
-      </div>
-
+          ))}
+        </div>
+      )}
     </section>
   );
 }

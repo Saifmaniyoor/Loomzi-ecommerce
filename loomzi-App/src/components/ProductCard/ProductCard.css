@@ -45,7 +45,12 @@
 }
 
 .loomzi-wishlist.active {
-  color: #e44f86;
+  color: #e04464;
+}
+
+.loomzi-wishlist:disabled {
+  opacity: 0.6;
+  cursor: wait;
 }
 
 .loomzi-product-info {
@@ -146,4 +151,37 @@
   display: block;
   width: 100%;
   height: 100%;
+}
+
+.loomzi-product-category {
+  color: #8a817b;
+  font-size: 13px;
+  margin: 6px 0 12px;
+}
+
+.loomzi-no-image {
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  background: #f5f2ef;
+  color: #8a817b;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+}
+
+.loomzi-stock-badge {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  background: #29231f;
+  color: #fff;
+  padding: 7px 10px;
+  font-size: 11px;
+  z-index: 2;
+}
+
+.loomzi-add-cart:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }

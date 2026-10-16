@@ -1,0 +1,125 @@
+
+.account-layout {
+  background: #faf7f3;
+  min-height: 75vh;
+  padding: 45px 20px 70px;
+}
+
+.account-layout-container {
+  max-width: 1250px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr);
+  gap: 30px;
+  align-items: start;
+}
+
+.account-sidebar {
+  background: #fff;
+  border: 1px solid #eee6df;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.account-sidebar-user {
+  padding: 30px 18px;
+  text-align: center;
+  border-bottom: 1px solid #eee6df;
+}
+
+.account-avatar {
+  width: 78px;
+  height: 78px;
+  border-radius: 50%;
+  background: #f0ded1;
+  color: #965c40;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 32px;
+  font-weight: 700;
+  margin: 0 auto 14px;
+}
+
+.account-sidebar-user h3 {
+  font-size: 17px;
+  color: #3e302a;
+  margin: 0 0 6px;
+}
+
+.account-sidebar-user p {
+  font-size: 12px;
+  color: #8b817b;
+  overflow-wrap: anywhere;
+  margin: 0;
+}
+
+.account-sidebar-nav {
+  padding: 14px 0;
+}
+
+.account-nav-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 15px 24px;
+  text-decoration: none;
+  color: #62564f;
+  font-size: 14px;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+}
+
+.account-nav-item svg {
+  font-size: 16px;
+}
+
+.account-nav-item:hover {
+  background: #faf2ec;
+}
+
+.account-nav-item.active {
+  background: #f5e9e0;
+  color: #a05c39;
+  border-left: 3px solid #a05c39;
+  font-weight: 600;
+}
+
+.account-logout {
+  color: #a94740;
+  margin-top: 12px;
+  border-top: 1px solid #eee6df;
+}
+
+.account-content {
+  min-width: 0;
+}
+
+@media (max-width: 800px) {
+  .account-layout-container {
+    grid-template-columns: 1fr;
+  }
+
+  .account-sidebar-nav {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .account-nav-item {
+    padding: 13px 15px;
+  }
+}
+
+@media (max-width: 480px) {
+  .account-layout {
+    padding: 20px 12px 45px;
+  }
+
+  .account-sidebar-nav {
+    grid-template-columns: 1fr;
+  }
+}

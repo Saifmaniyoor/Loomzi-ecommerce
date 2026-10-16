@@ -218,3 +218,49 @@
     font-size: 13px;
   }
 }
+
+/* Product link */
+
+.favorite-product-link {
+  color: inherit;
+  text-decoration: none;
+}
+
+.favorite-product-link:hover h3 {
+  text-decoration: underline;
+}
+
+/* Product category */
+
+.favorite-info .product-category {
+  font-size: 13px;
+  color: #8a817b;
+  margin: 4px 0 8px;
+}
+
+/* Image link */
+
+.favorite-image a {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* Placeholder when product has no image */
+
+.favorite-image .product-image-placeholder {
+  width: 100%;
+  height: 100%;
+  background-color: #f5f2ef;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #8a817b;
+  font-size: 13px;
+}
+
+@media (max-width: 600px) {
+  .favorite-info .product-category {
+    font-size: 11px;
+  }
+}

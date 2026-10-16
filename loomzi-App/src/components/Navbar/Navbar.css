@@ -551,3 +551,41 @@
     max-width: calc(100vw - 20px);
   }
 }
+
+/* ===============================
+   Cart Notification Badge
+================================ */
+
+.navbar-cart {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.navbar-cart-badge {
+  position: absolute;
+  top: -7px;
+  right: -9px;
+
+  min-width: 19px;
+  height: 19px;
+  padding: 0 4px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  background-color: #b85c50;
+  color: #ffffff;
+
+  border: 2px solid #ffffff;
+  border-radius: 999px;
+
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+
+  box-sizing: content-box;
+  pointer-events: none;
+}
