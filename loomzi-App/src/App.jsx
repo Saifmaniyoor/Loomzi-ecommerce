@@ -1,3 +1,6 @@
+import AdminForgotPassword from "./pages/Admin/Login/AdminForgotPassword";
+import AdminAccountSettings from "./pages/Admin/Settings/AdminAccountSettings";
+
 import { Routes, Route } from "react-router-dom";
 
 // ===============================
@@ -14,9 +17,11 @@ import MyOrders from "./pages/MyOrders/MyOrders";
 import ProductListing from "./pages/ProductListing/ProductListing";
 import ProductDetails from "./pages/ProductDetails/ProductDetails";
 import Cart from "./pages/Cart/Cart";
+import Checkout from "./pages/Checkout/Checkout";
 import Profile from "./pages/Profile/Profile";
 import Addresses from "./pages/Addresses/Addresses";
 import Wishlist from "./pages/Wishlist/Wishlist";
+import AboutUs from "./pages/AboutUs/AboutUs";
 
 // ===============================
 // Customer Layout and Protection
@@ -31,6 +36,8 @@ import ProtectedRoute from "./components/ProtectedRoute/ProtectedRoute";
 import AdminLogin from "./pages/Admin/Login/AdminLogin";
 import AdminDashboard from "./pages/Admin/Dashboard/AdminDashboard";
 import CustomerManagement from "./pages/Admin/Customers/CustomerManagement";
+import OrderManagement from "./pages/Admin/Orders/OrderManagement";
+import OfferManagement from './pages/Admin/Offers/OfferManagement';
 
 // ===============================
 // Admin Layout and Protection
@@ -48,7 +55,12 @@ import CategoryManagement from "./pages/Admin/Categories/CategoryManagement";
 // ===============================
 import ProductManagement from "./pages/Admin/Products/ProductManagement";
 import AddProduct from "./pages/Admin/Products/AddProduct";
+import OrderSuccess from "./pages/OrderSuccess/OrderSuccess";
+import OrderDetails from "./pages/OrderDetails/OrderDetails";
 
+import CouponManagement from "./pages/Admin/Coupons/CouponManagement";
+import ShippingManagement from "./pages/Admin/Settings/ShippingManagement";
+import CancellationPolicy from "./pages/CancellationPolicy/CancellationPolicy";
 import "./App.css";
 
 function App() {
@@ -58,15 +70,21 @@ function App() {
           CUSTOMER PAGES - NAVBAR & FOOTER
       =================================== */}
       <Route element={<MainLayout />}>
+
         <Route path="/" element={<Home />} />
 
         <Route path="/products" element={<ProductListing />} />
 
         <Route path="/products/:id" element={<ProductDetails />} />
 
+        <Route path="/about" element={<AboutUs />} />
+        <Route path="/cancellation-policy" element={<CancellationPolicy />} />
+
         {/* Protected Customer Pages */}
         <Route element={<ProtectedRoute />}>
           <Route path="/cart" element={<Cart />} />
+
+          <Route path="/checkout" element={<Checkout />} />
 
           {/* Shared Customer Account Layout */}
           <Route element={<AccountLayout />}>
@@ -74,7 +92,8 @@ function App() {
             <Route path="/addresses" element={<Addresses />} />
             <Route path="/my-orders" element={<MyOrders />} />
             <Route path="/wishlist" element={<Wishlist />} />
-
+            <Route path="/order-success/:orderId" element={<OrderSuccess />} />
+            <Route path="/orders/:orderId" element={<OrderDetails />} />
           </Route>
         </Route>
       </Route>
@@ -98,6 +117,7 @@ function App() {
           ADMIN LOGIN
       =================================== */}
       <Route path="/admin/login" element={<AdminLogin />} />
+      <Route path="/admin/forgot-password" element={<AdminForgotPassword />} />
 
       {/* ===================================
           PROTECTED ADMIN PAGES
@@ -107,14 +127,19 @@ function App() {
           <Route path="dashboard" element={<AdminDashboard />} />
 
           <Route path="customers" element={<CustomerManagement />} />
+          <Route path="orders" element={<OrderManagement />} />
 
           <Route path="categories" element={<CategoryManagement />} />
 
           <Route path="products" element={<ProductManagement />} />
 
           <Route path="products/add" element={<AddProduct />} />
+          <Route path="coupons" element={<CouponManagement />} />
+          <Route path="settings/shipping" element={<ShippingManagement />} />
+          <Route path="settings/account" element={<AdminAccountSettings />} />
 
           <Route path="products/edit/:id" element={<AddProduct />} />
+          <Route path="offers" element={<OfferManagement />} />
         </Route>
       </Route>
     </Routes>

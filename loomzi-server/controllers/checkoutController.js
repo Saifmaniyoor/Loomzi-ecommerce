@@ -13,6 +13,9 @@ const {
   calculateFinalAmount,
 } = require("../utils/checkoutCalculation");
 
+const roundAmount = (amount) =>
+  Math.round((amount + Number.EPSILON) * 100) / 100;
+
 const previewCheckout = async (req, res) => {
   try {
     const userId = req.user?._id || req.session?.userId;
@@ -68,7 +71,16 @@ const previewCheckout = async (req, res) => {
       });
     }
 
-    // 5. Validate coupon and calculate discount
+    // 5. Get product offer savings
+    const offerSavings = roundAmount(
+      Number(cart.totalSavings ?? 0)
+    );
+
+    const originalSubtotal = roundAmount(
+      Number(cart.subtotal) + offerSavings
+    );
+
+    // 6. Validate coupon and calculate discount
     let appliedCoupon = null;
     let discount = 0;
 
@@ -106,7 +118,7 @@ const previewCheckout = async (req, res) => {
       };
     }
 
-    // 6. Calculate final payment using shared utility
+    // 7. Calculate final payment using shared utility
     let paymentSummary;
 
     try {
@@ -121,7 +133,16 @@ const previewCheckout = async (req, res) => {
       });
     }
 
-    // 7. Return checkout preview
+    // 8. Calculate total savings
+    const couponSavings = roundAmount(
+      Number(paymentSummary.discount ?? 0)
+    );
+
+    const totalSavings = roundAmount(
+      offerSavings + couponSavings
+    );
+
+    // 9. Return checkout preview
     return res.status(200).json({
       message: "Checkout preview generated successfully",
 
@@ -138,9 +159,24 @@ const previewCheckout = async (req, res) => {
       },
 
       items: cart.items,
+
+      // Original subtotal before product offers
+      originalSubtotal,
+
+      // Product/category/manual offer savings
+      offerSavings,
+
+      // Subtotal after product offers
       subtotal: paymentSummary.subtotal,
+
       coupon: appliedCoupon,
+
+      // Coupon discount
       discount: paymentSummary.discount,
+
+      // Combined offer and coupon savings
+      totalSavings,
+
       shippingCharge: paymentSummary.shippingCharge,
       tax: paymentSummary.tax,
       finalTotal: paymentSummary.totalAmount,

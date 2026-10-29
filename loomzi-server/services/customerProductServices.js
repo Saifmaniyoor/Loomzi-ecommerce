@@ -1,5 +1,11 @@
 const Product = require("../models/Product");
 const Category = require("../models/Category");
+const { loadActiveOffers, calculateOfferPrice } = require("./offerPricingServices");
+
+const withOffer = (product, offers) => {
+  const pricing = calculateOfferPrice({ productId: product._id, categoryId: product.category?._id || product.category, price: product.price, manualOfferPrice: product.offerPrice, offers });
+  return { ...product, ...pricing };
+};
 
 const getListedProducts = async (search, page, limit, categoryId) => {
   const listedCategories = await Category.find({
@@ -43,8 +49,9 @@ const getListedProducts = async (search, page, limit, categoryId) => {
     Product.countDocuments(query),
   ]);
 
+  const offers = await loadActiveOffers();
   return {
-    products,
+    products: products.map(p => withOffer(p, offers)),
     totalProducts,
     currentPage: page,
     totalPages: Math.ceil(totalProducts / limit),
@@ -63,7 +70,8 @@ const getListedProductById = async (productId) => {
     return null;
   }
 
-  return product;
+  const offers = await loadActiveOffers();
+  return withOffer(product, offers);
 };
 
 module.exports = {

@@ -164,7 +164,7 @@ const reserveCartItems = async (items) => {
           productId: item.productId,
           variantId: item.variantId || null,
           quantity,
-          expectedPrice: item.price,
+          expectedPrice: item.originalPrice ?? item.price,
           session,
         });
 

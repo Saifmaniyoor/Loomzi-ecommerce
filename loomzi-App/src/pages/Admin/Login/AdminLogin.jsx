@@ -23,7 +23,7 @@ function AdminLogin() {
 
   try {
     const response = await fetch(
-      "http://localhost:5000/api/admin/login",
+      `${import.meta.env.VITE_API_URL || "http://localhost:5000"}/api/admin/login`,
       {
         method: "POST",
         headers: {
@@ -115,6 +115,8 @@ function AdminLogin() {
               {showPassword ? <FaEyeSlash /> : <FaEye />}
             </button>
           </div>
+
+          <Link to="/admin/forgot-password" className="admin-forgot-link">Forgot password?</Link>
 
           {error && (
             <p className="admin-login-error" role="alert">

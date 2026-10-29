@@ -179,6 +179,7 @@ function Register() {
       navigate("/verify-otp", {
         state: {
           email: formData.email.trim().toLowerCase(),
+          resendAvailableAt: data.resendAvailableAt,
         },
       });
 

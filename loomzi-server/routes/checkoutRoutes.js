@@ -17,37 +17,77 @@ const {
   validatePaymentCheckout,
 } = require("../controllers/paymentCheckoutController");
 
-// NEW: Pending order controller
 const {
   createPendingOrder,
 } = require("../controllers/pendingOrderController");
 
-// Checkout preview
+// NEW: COD checkout controller
+const {
+  placeCODOrder,
+  getCODCheckoutStatus,
+} = require("../controllers/codCheckoutController");
+
+// ======================================
+// Checkout Preview
+// ======================================
+
 router.post(
   "/preview",
   requireUser,
   previewCheckout
 );
 
-// Prepare checkout attempt
+// ======================================
+// Prepare Checkout Attempt
+// ======================================
+
 router.post(
   "/prepare",
   requireUser,
   prepareCheckoutAttempt
 );
 
-// Validate payment checkout
+// ======================================
+// Validate Razorpay Checkout
+// ======================================
+
 router.post(
   "/validate-payment",
   requireUser,
   validatePaymentCheckout
 );
 
-// NEW: Create pending order and reserve stock
+// ======================================
+// Create Pending Razorpay Order
+// ======================================
+
 router.post(
   "/pending-order",
   requireUser,
   createPendingOrder
 );
 
+// ======================================
+// Place COD Order
+// ======================================
+
+router.post(
+  "/cod",
+  requireUser,
+  placeCODOrder
+);
+
+// ======================================
+// Check Previous COD Checkout Status
+// ======================================
+
+router.get(
+  "/cod/status",
+  requireUser,
+  getCODCheckoutStatus
+);
+
+const { createCheckoutRazorpayOrder, getRazorpayCheckoutStatus } = require("../controllers/razorpayOrderController");
+router.post("/razorpay/order", requireUser, createCheckoutRazorpayOrder);
+router.get("/razorpay/status/:orderId", requireUser, getRazorpayCheckoutStatus);
 module.exports = router;

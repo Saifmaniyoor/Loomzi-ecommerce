@@ -1,4 +1,9 @@
+
 const CheckoutAttempt = require("../models/CheckoutAttempt");
+
+// ======================================
+// 1. Find Checkout Attempt
+// ======================================
 
 const findAttempt = async (userId, idempotencyKey) => {
   return CheckoutAttempt.findOne({
@@ -7,11 +12,23 @@ const findAttempt = async (userId, idempotencyKey) => {
   });
 };
 
+// ======================================
+// 2. Create Checkout Attempt
+// ======================================
+
 const createAttempt = async (data) => {
   return CheckoutAttempt.create(data);
 };
 
-const updateAttempt = async (attemptId, expectedStatus, updateData) => {
+// ======================================
+// 3. Update Checkout Attempt
+// ======================================
+
+const updateAttempt = async (
+  attemptId,
+  expectedStatus,
+  updateData
+) => {
   return CheckoutAttempt.findOneAndUpdate(
     {
       _id: attemptId,
@@ -23,9 +40,13 @@ const updateAttempt = async (attemptId, expectedStatus, updateData) => {
     {
       new: true,
       runValidators: true,
-    },
+    }
   );
 };
+
+// ======================================
+// 4. Link Razorpay Attempt to Order
+// ======================================
 
 const linkAttemptToOrder = async (
   attemptId,
@@ -33,12 +54,16 @@ const linkAttemptToOrder = async (
   orderId,
   cartSnapshotHash,
   amountInPaise,
-  session,
+  session
 ) => {
   return CheckoutAttempt.findOneAndUpdate(
     {
       _id: attemptId,
       user: userId,
+
+      // Only Razorpay attempts
+      paymentMethod: "Razorpay",
+
       status: "Processing",
       order: null,
       cartSnapshotHash: null,
@@ -55,11 +80,25 @@ const linkAttemptToOrder = async (
       new: true,
       session,
       runValidators: true,
-    },
+    }
   );
 };
 
-const findOrCreateAttempt = async ({ userId, idempotencyKey, requestHash }) => {
+// ======================================
+// 5. Find or Create Checkout Attempt
+// Supports Razorpay and COD
+// ======================================
+
+const findOrCreateAttempt = async ({
+  userId,
+  idempotencyKey,
+  requestHash,
+  paymentMethod = "Razorpay",
+}) => {
+  if (!["Razorpay", "COD"].includes(paymentMethod)) {
+    throw new Error("Invalid payment method");
+  }
+
   try {
     const attempt = await CheckoutAttempt.findOneAndUpdate(
       {
@@ -71,6 +110,7 @@ const findOrCreateAttempt = async ({ userId, idempotencyKey, requestHash }) => {
           user: userId,
           idempotencyKey,
           requestHash,
+          paymentMethod,
           status: "Processing",
         },
       },
@@ -78,13 +118,12 @@ const findOrCreateAttempt = async ({ userId, idempotencyKey, requestHash }) => {
         upsert: true,
         new: true,
         runValidators: true,
-      },
+      }
     );
 
     return attempt;
   } catch (error) {
-    // Handle concurrent requests racing to create
-    // the same unique checkout key.
+    // Handle concurrent requests using the same key
     if (error.code === 11000) {
       return CheckoutAttempt.findOne({
         user: userId,
@@ -96,12 +135,24 @@ const findOrCreateAttempt = async ({ userId, idempotencyKey, requestHash }) => {
   }
 };
 
-const claimPaymentCreation = async ({ attemptId, userId, orderId }) => {
+// ======================================
+// 6. Claim Razorpay Payment Creation
+// ======================================
+
+const claimPaymentCreation = async ({
+  attemptId,
+  userId,
+  orderId,
+}) => {
   return CheckoutAttempt.findOneAndUpdate(
     {
       _id: attemptId,
       user: userId,
       order: orderId,
+
+      // Prevent COD from entering Razorpay flow
+      paymentMethod: "Razorpay",
+
       status: "Processing",
       razorpayOrderId: null,
     },
@@ -114,9 +165,13 @@ const claimPaymentCreation = async ({ attemptId, userId, orderId }) => {
     {
       new: true,
       runValidators: true,
-    },
+    }
   );
 };
+
+// ======================================
+// 7. Mark Razorpay Recovery Required
+// ======================================
 
 const markPaymentRecoveryRequired = async ({
   attemptId,
@@ -130,13 +185,18 @@ const markPaymentRecoveryRequired = async ({
   };
 
   if (razorpayOrderId) {
-    updateData.recoveryRazorpayOrderId = razorpayOrderId;
+    updateData.recoveryRazorpayOrderId =
+      razorpayOrderId;
   }
 
   return CheckoutAttempt.findOneAndUpdate(
     {
       _id: attemptId,
       user: userId,
+
+      // Only Razorpay attempts
+      paymentMethod: "Razorpay",
+
       status: "Creating Payment",
     },
     {
@@ -145,9 +205,13 @@ const markPaymentRecoveryRequired = async ({
     {
       new: true,
       runValidators: true,
-    },
+    }
   );
 };
+
+// ======================================
+// 8. Attach Razorpay Order ID
+// ======================================
 
 const attachPaymentOrderToAttempt = async ({
   attemptId,
@@ -160,6 +224,10 @@ const attachPaymentOrderToAttempt = async ({
       _id: attemptId,
       user: userId,
       order: orderId,
+
+      // Only Razorpay attempts
+      paymentMethod: "Razorpay",
+
       status: "Creating Payment",
       razorpayOrderId: null,
     },
@@ -173,13 +241,21 @@ const attachPaymentOrderToAttempt = async ({
     {
       new: true,
       runValidators: true,
-    },
+    }
   );
 };
+
+// ======================================
+// 9. Find Attempt by ID
+// ======================================
 
 const findAttemptById = async (attemptId) => {
   return CheckoutAttempt.findById(attemptId);
 };
+
+// ======================================
+// Exports
+// ======================================
 
 module.exports = {
   findAttempt,

@@ -1,4 +1,3 @@
-
 .cart-page {
   min-height: 75vh;
   background: #faf7f2;
@@ -345,89 +344,43 @@
   }
 }
 
-
-/* Coupon Section */
-
-.cart-coupon-section {
-  margin: 22px 0;
-  padding: 18px 0;
-  border-top: 1px solid #e8e3df;
-}
-
-.cart-coupon-section h3 {
-  font-size: 15px;
-  font-weight: 600;
-  margin-bottom: 12px;
-}
-
-.cart-coupon-form {
+/* Offer pricing additions for Cart.css */
+.cart-offer-prices {
   display: flex;
-  gap: 8px;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 10px;
 }
-
-.cart-coupon-form input {
-  flex: 1;
-  min-width: 0;
-  padding: 11px 12px;
-  border: 1px solid #d8d2cc;
-  border-radius: 6px;
-  font-size: 14px;
-  outline: none;
+.cart-final-price {
+  color: #b66b08;
+  font-weight: 700;
 }
-
-.cart-coupon-form input:focus {
-  border-color: #735b48;
+.cart-regular-price {
+  color: #858585;
+  text-decoration: line-through;
+  font-size: 0.9em;
+  font-weight: 400;
 }
-
-.cart-coupon-form button {
-  padding: 10px 16px;
-  background: #2d2926;
-  color: white;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 13px;
-  font-weight: 600;
+.cart-offer-tags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px;
+  margin: 8px 0;
 }
-
-.cart-coupon-form button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.cart-coupon-hint {
+.cart-offer-name {
+  background: #fff0d6;
+  color: #9b5800;
+  padding: 5px 9px;
+  border-radius: 5px;
   font-size: 12px;
-  color: #866a4b;
-  margin-bottom: 10px;
+  font-weight: 700;
 }
-
-.cart-coupon-error {
-  color: #b42318;
+.cart-offer-percent {
+  background: #e8f5e9;
+  color: #28753b;
+  padding: 5px 9px;
+  border-radius: 5px;
   font-size: 12px;
-  margin-top: 10px;
-}
-
-.cart-coupon-success {
-  color: #21824a;
-  font-size: 12px;
-  margin-top: 10px;
-}
-
-.cart-discount {
-  color: #21824a;
-  font-weight: 600;
-}
-
-@media (max-width: 480px) {
-  .cart-coupon-form {
-    flex-wrap: wrap;
-  }
-
-  .cart-coupon-form input {
-    flex-basis: 100%;
-  }
-
-  .cart-coupon-form button {
-    width: 100%;
-  }
+  font-weight: 700;
 }

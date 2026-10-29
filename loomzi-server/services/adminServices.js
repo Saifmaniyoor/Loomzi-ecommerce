@@ -31,7 +31,7 @@ const findAdminForLogin = async (identifier) => {
 };
 
 const findAdminById = async (id) => {
-  return await Admin.findById(id).select("fullName email phone role isActive");
+  return await Admin.findById(id).select("fullName email phone role isActive credentialVersion");
 };
 
 const User = require("../models/User");

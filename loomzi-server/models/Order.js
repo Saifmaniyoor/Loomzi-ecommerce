@@ -1,4 +1,3 @@
-
 const mongoose = require("mongoose");
 
 const orderItemSchema = new mongoose.Schema(
@@ -40,6 +39,14 @@ const orderItemSchema = new mongoose.Schema(
       min: 0,
     },
 
+    originalPrice: { type: Number, min: 0 },
+    offerDiscount: { type: Number, default: 0, min: 0 },
+    appliedOffer: {
+      id: { type: String, default: null },
+      name: { type: String, default: null },
+      type: { type: String, default: null },
+      discountPercentage: { type: Number, default: null },
+    },
     quantity: {
       type: Number,
       required: true,
@@ -58,6 +65,7 @@ const orderItemSchema = new mongoose.Schema(
         "Pending",
         "Confirmed",
         "Shipped",
+        "Out for Delivery",
         "Delivered",
         "Cancelled",
         "Return Requested",
@@ -66,7 +74,7 @@ const orderItemSchema = new mongoose.Schema(
       default: "Pending",
     },
   },
-  { _id: true }
+  { _id: true },
 );
 
 const orderSchema = new mongoose.Schema(
@@ -136,20 +144,23 @@ const orderSchema = new mongoose.Schema(
 
     paymentMethod: {
       type: String,
-      enum: ["Razorpay"],
+      enum: ["Razorpay", "COD"],
       default: "Razorpay",
+      required: true,
     },
 
     paymentStatus: {
       type: String,
-      enum: [
-        "Pending",
-        "Paid",
-        "Failed",
-        "Refunded",
-        "Partially Refunded",
-      ],
+      enum: ["Pending", "Paid", "Failed", "Refunded", "Partially Refunded"],
       default: "Pending",
+    },
+
+    refund: {
+      status: { type: String, enum: ["Not Required", "Initiating", "Pending", "Processed", "Needs Review"], default: "Not Required" },
+      razorpayRefundId: { type: String, default: null },
+      amount: { type: Number, default: 0 },
+      requestedAt: { type: Date, default: null },
+      note: { type: String, default: "" },
     },
 
     razorpayOrderId: {
@@ -162,6 +173,19 @@ const orderSchema = new mongoose.Schema(
       default: null,
     },
 
+    tracking: {
+      courier: { type: String, default: "", maxlength: 100 },
+      trackingNumber: { type: String, default: "", maxlength: 120 },
+      trackingUrl: { type: String, default: "", maxlength: 1000 },
+      estimatedDelivery: { type: Date, default: null },
+    },
+    statusHistory: [{
+      status: { type: String, required: true },
+      note: { type: String, default: "", maxlength: 500 },
+      changedAt: { type: Date, default: Date.now },
+      updatedBy: { type: String, enum: ["admin", "customer", "system"], default: "admin" },
+    }],
+
     orderStatus: {
       type: String,
       enum: [
@@ -169,6 +193,7 @@ const orderSchema = new mongoose.Schema(
         "Confirmed",
         "Processing",
         "Shipped",
+        "Out for Delivery",
         "Delivered",
         "Cancelled",
       ],
@@ -177,7 +202,7 @@ const orderSchema = new mongoose.Schema(
   },
   {
     timestamps: true,
-  }
+  },
 );
 
 // Prevent duplicate Razorpay order IDs
@@ -188,9 +213,8 @@ orderSchema.index(
     partialFilterExpression: {
       razorpayOrderId: { $type: "string" },
     },
-  }
+  },
 );
-
 
 orderSchema.index(
   { razorpayPaymentId: 1 },
@@ -199,8 +223,7 @@ orderSchema.index(
     partialFilterExpression: {
       razorpayPaymentId: { $type: "string" },
     },
-  }
+  },
 );
-
 
 module.exports = mongoose.model("Order", orderSchema);

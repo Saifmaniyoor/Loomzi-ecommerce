@@ -185,7 +185,7 @@ const createPendingOrderWithReservation = async ({
             productId: item.productId,
             variantId: item.variantId || null,
             quantity,
-            expectedPrice: item.price,
+            expectedPrice: item.originalPrice ?? item.price,
             session,
           });
 
@@ -217,6 +217,9 @@ const createPendingOrderWithReservation = async ({
         color: item.color || "",
         size: item.size || "",
         price: item.price,
+        originalPrice: item.originalPrice ?? item.price,
+        offerDiscount: item.offerDiscount || 0,
+        appliedOffer: item.appliedOffer || null,
         quantity: item.quantity,
         lineTotal: item.lineTotal,
         status: "Pending",

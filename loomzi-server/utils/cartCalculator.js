@@ -1,5 +1,9 @@
 
 const cartServices = require("../services/cartServices");
+const {
+  loadActiveOffers,
+  calculateOfferPrice,
+} = require("../services/offerPricingServices");
 
 const roundAmount = (amount) =>
   Math.round((amount + Number.EPSILON) * 100) / 100;
@@ -57,9 +61,11 @@ const getProductAvailability = (product, variantId) => {
 const calculateCartSummary = async (userId) => {
   const cart = await cartServices.findCartWithProducts(userId);
   const settings = await cartServices.findShippingSettings();
+  const activeOffers = await loadActiveOffers();
 
   const items = [];
   let subtotal = 0;
+  let totalSavings = 0;
   let hasUnavailableItems = false;
 
   for (const item of cart?.items || []) {
@@ -104,7 +110,19 @@ const calculateCartSummary = async (userId) => {
     }
 
     const quantity = Number(item.quantity);
-    const price = availability.price;
+
+    const offerPrice = calculateOfferPrice({
+      productId: fullProduct._id,
+      categoryId:
+        fullProduct.category?._id || fullProduct.category,
+      price: availability.price,
+      manualOfferPrice:
+        availability.variant?.offerPrice ??
+        fullProduct.offerPrice,
+      offers: activeOffers,
+    });
+
+    const price = offerPrice.price;
     const stock = availability.stock;
 
     const isAvailable =
@@ -125,6 +143,23 @@ const calculateCartSummary = async (userId) => {
 
     if (isAvailable) {
       subtotal = roundAmount(subtotal + lineTotal);
+
+      // Savings are measured against the original regular price.
+      const originalPrice = Number(offerPrice.originalPrice);
+
+      if (
+        Number.isFinite(originalPrice) &&
+        originalPrice >= 0
+      ) {
+        const originalLineTotal = roundAmount(
+          originalPrice * quantity
+        );
+
+        totalSavings = roundAmount(
+          totalSavings +
+            Math.max(0, originalLineTotal - lineTotal)
+        );
+      }
     }
 
     items.push({
@@ -136,6 +171,9 @@ const calculateCartSummary = async (userId) => {
       color: availability.variant?.color || "",
       size: availability.variant?.size || "",
       price,
+      originalPrice: offerPrice.originalPrice,
+      offerDiscount: offerPrice.offerDiscount,
+      appliedOffer: offerPrice.appliedOffer,
       quantity,
       stock,
       available: isAvailable,
@@ -161,6 +199,7 @@ const calculateCartSummary = async (userId) => {
   return {
     items,
     subtotal: roundAmount(subtotal),
+    totalSavings: roundAmount(totalSavings),
     shippingCharge: roundAmount(shippingCharge),
     tax: 0,
     total: roundAmount(subtotal + shippingCharge),

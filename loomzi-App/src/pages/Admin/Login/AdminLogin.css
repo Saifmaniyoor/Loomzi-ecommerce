@@ -127,3 +127,6 @@
     padding: 35px 22px;
   }
 }
+
+.admin-forgot-link { align-self: flex-end; margin: -12px 0 20px; color: #7c4c40; font-weight: 600; text-decoration: none; }
+.admin-forgot-link:hover { text-decoration: underline; }

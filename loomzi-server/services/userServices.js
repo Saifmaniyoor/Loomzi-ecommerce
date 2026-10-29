@@ -45,6 +45,7 @@ const markEmailVerified = (userId) =>
     $unset: {
       otp: "",
       otpExpires: "",
+      otpResendAvailableAt: "",
     },
   });
 

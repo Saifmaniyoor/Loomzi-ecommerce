@@ -1,5 +1,5 @@
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   useLocation,
   useNavigate,
@@ -18,6 +18,50 @@ function VerifyOtp() {
   const [otp, setOtp] = useState([
     "", "", "", "", "", ""
   ]);
+
+  const [resendAvailableAt, setResendAvailableAt] = useState(() => {
+    const key = `loomzi-otp-resend:${email.trim().toLowerCase()}`;
+    const stored = sessionStorage.getItem(key);
+    const initial = location.state?.resendAvailableAt || stored;
+    return initial ? new Date(initial).getTime() : Date.now() + 5 * 60 * 1000;
+  });
+  const [now, setNow] = useState(Date.now());
+  const [resending, setResending] = useState(false);
+  const secondsLeft = Math.max(0, Math.ceil((resendAvailableAt - now) / 1000));
+  const formatTime = (seconds) => `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
+
+  useEffect(() => {
+    if (!email) return;
+    sessionStorage.setItem(`loomzi-otp-resend:${email.trim().toLowerCase()}`, new Date(resendAvailableAt).toISOString());
+  }, [email, resendAvailableAt]);
+
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const handleResendOtp = async () => {
+    if (!email || secondsLeft > 0 || resending || message) return;
+    setResending(true);
+    setError("");
+    try {
+      const response = await fetch("http://localhost:5000/api/auth/resend-otp", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.trim().toLowerCase() }),
+      });
+      const data = await response.json();
+      if (data.resendAvailableAt) setResendAvailableAt(new Date(data.resendAvailableAt).getTime());
+      if (!response.ok) throw new Error(data.message || "Unable to resend OTP");
+      setOtp(["", "", "", "", "", ""]);
+      setMessage("");
+      setError("");
+      inputRefs.current[0]?.focus();
+    } catch (err) {
+      setError(err.message || "Unable to resend OTP");
+    } finally {
+      setResending(false);
+    }
+  };
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -271,12 +315,14 @@ function VerifyOtp() {
           Your OTP is valid for 5 minutes.
         </p>
 
-        {/* Resend OTP - Not implemented yet */}
         <p className="verify-footer">
           Didn't receive the code?{" "}
-          <span className="resend-placeholder">
-            Resend OTP (coming next)
-          </span>
+          <button type="button" className="resend-placeholder"
+            disabled={secondsLeft > 0 || resending || Boolean(message)}
+            onClick={handleResendOtp}>
+            {resending ? "Sending..." : secondsLeft > 0
+              ? `Resend OTP (${formatTime(secondsLeft)})` : "Resend OTP"}
+          </button>
         </p>
 
         {/* Back to Registration */}

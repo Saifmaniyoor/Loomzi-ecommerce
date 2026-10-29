@@ -21,6 +21,13 @@ const checkoutAttemptSchema = new mongoose.Schema(
       required: true,
     },
 
+    paymentMethod: {
+      type: String,
+      enum: ["Razorpay", "COD"],
+      default: "Razorpay",
+      required: true,
+    },
+
     order: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Order",

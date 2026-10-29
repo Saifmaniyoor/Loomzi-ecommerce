@@ -171,3 +171,6 @@
     font-size: 22px;
   }
 }
+
+.resend-placeholder { background: transparent; border: 0; padding: 0; cursor: pointer; font: inherit; font-weight: 600; color: #ad833b; }
+.resend-placeholder:disabled { cursor: not-allowed; opacity: 0.65; }

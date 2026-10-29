@@ -1,0 +1,10 @@
+const router = require("express").Router();
+const requireUser = require("../middleware/requireUser");
+const ctrl = require("../controllers/reviewController");
+router.get("/summaries", ctrl.getRatingSummaries);
+router.get("/product/:productId", ctrl.getProductReviews);
+router.get("/eligibility/:productId", requireUser, ctrl.getEligibility);
+router.post("/", requireUser, ctrl.createReview);
+router.patch("/:reviewId", requireUser, ctrl.updateReview);
+router.delete("/:reviewId", requireUser, ctrl.deleteReview);
+module.exports = router;

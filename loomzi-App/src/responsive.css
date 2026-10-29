@@ -1,0 +1,79 @@
+/* Loomzi responsive refinements — loaded after page styles.
+   Keep horizontal scrolling inside data tables, not the entire page. */
+:root { -webkit-text-size-adjust: 100%; }
+*, *::before, *::after { box-sizing: border-box; }
+html, body, #root { width: 100%; min-width: 0; }
+body { margin: 0; overflow-x: clip; }
+img, video, svg { max-width: 100%; }
+img, video { height: auto; }
+button, input, select, textarea { font: inherit; }
+input, select, textarea { max-width: 100%; }
+button, a { -webkit-tap-highlight-color: transparent; }
+:where(.admin-layout-main, .admin-layout-content, .account-content, .checkout-main, .checkout-summary, .loomzi-products-section, .pd-information, .pd-gallery) { min-width: 0; }
+:where(.offer-table-wrap, .oa-table, .product-table-wrapper, .customer-table-wrapper, .category-table-wrapper, .loomzi-table-scroll) { max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+:where(.offer-table-wrap, .oa-table, .product-table-wrapper, .customer-table-wrapper, .category-table-wrapper) table { white-space: normal; }
+:where(.loomzi-order-admin, .loomzi-offers, .product-management, .customer-management, .category-management, .add-product-page, .lm-settings) { min-width: 0; max-width: 100%; }
+
+@media (max-width: 1024px) {
+  .pd-main { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; }
+  .pd-related-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .loomzi-stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .loomzi-dashboard-title-row, .loomzi-dashboard-actions { flex-wrap: wrap; }
+}
+
+@media (max-width: 768px) {
+  .admin-layout { flex-direction: column; }
+  .admin-layout-main, .admin-layout-content { width: 100%; }
+  .loomzi-admin-header { max-width: 100%; }
+  .loomzi-dashboard-content, .loomzi-dashboard-workspace { min-width: 0; }
+  .loomzi-dashboard-title-row, .loomzi-dashboard-actions, .product-toolbar, .product-heading, .customer-heading, .category-heading, .category-heading-actions, .oa-heading { flex-wrap: wrap; gap: 12px; }
+  .loomzi-header-search { max-width: 100%; }
+  .pd-main, .pd-description-content { grid-template-columns: minmax(0, 1fr); }
+  .pd-gallery, .pd-information { width: 100%; }
+  .pd-related-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .checkout-layout { grid-template-columns: minmax(0, 1fr); }
+  .checkout-summary { width: 100%; }
+  .offer-form, .oa-form, .checkout-address-form-grid { grid-template-columns: minmax(0, 1fr); }
+  .announcement-container { grid-template-columns: minmax(0, 1fr); }
+  .announcement-offer { min-height: 200px; }
+  .announcement-coupon { border-left: 0; border-top: 1px solid #ead8d1; }
+  .announcement-offer-only, .announcement-coupon-only { grid-template-columns: minmax(0, 1fr); }
+}
+
+@media (max-width: 600px) {
+  :where(.loomzi-offers, .loomzi-order-admin, .product-management, .customer-management, .category-management, .add-product-page, .lm-settings) { padding: 14px; }
+  .offer-panel, .oa-detail { padding: 16px; }
+  .loomzi-offers h1 { font-size: clamp(23px, 6vw, 30px); }
+  .offer-panel h2 { font-size: 19px; }
+  .offer-actions, .oa-heading, .oa-pagination, .offer-row-actions { flex-wrap: wrap; }
+  .offer-actions > button { min-height: 42px; }
+  .oa-form { gap: 12px; }
+  .oa-table table { min-width: 690px; }
+  .offer-table-wrap table { min-width: 760px; }
+  .pd-purchase-row { flex-wrap: wrap; }
+  .pd-add-to-cart { flex: 1 1 180px; }
+  .pd-related-grid, .loomzi-products-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .pd-tabs { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .pd-tabs button { flex-shrink: 0; }
+  .announcement-offer { padding: 25px 44px 36px; min-height: 210px; }
+  .announcement-offer-title { font-size: clamp(19px, 6vw, 25px); overflow-wrap: anywhere; }
+  .announcement-coupon { padding: 14px; }
+  .announcement-coupon-content { max-width: 100%; }
+  .checkout-address-form-grid { grid-template-columns: minmax(0, 1fr); }
+  .checkout-order-item, .order-details-product, .my-orders-product { min-width: 0; }
+  .my-orders-product h3, .order-details-product h3 { overflow-wrap: anywhere; }
+  .order-tracking-timeline { max-width: 100%; }
+  .loomzi-stats-grid { grid-template-columns: minmax(0, 1fr); }
+  .loomzi-dashboard-actions > button { max-width: 100%; }
+}
+
+@media (max-width: 380px) {
+  .loomzi-products-grid, .pd-related-grid { grid-template-columns: minmax(0, 1fr); }
+  .announcement-offer { padding-inline: 38px; }
+  .announcement-shop-link { padding: 9px 14px; }
+  .offer-panel, .oa-detail { padding: 12px; }
+}
+
+@media (hover: none) and (pointer: coarse) {
+  :where(.offer-actions, .offer-row-actions, .oa-pagination) button { min-height: 40px; }
+}

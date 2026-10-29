@@ -26,12 +26,18 @@ const variantSchema = new mongoose.Schema(
       min: 0,
     },
 
+    offerPrice: {
+      type: Number,
+      default: null,
+      min: 0,
+    },
+
     sku: {
       type: String,
       trim: true,
     },
   },
-  { _id: true }
+  { _id: true },
 );
 
 const productSchema = new mongoose.Schema(
@@ -57,6 +63,12 @@ const productSchema = new mongoose.Schema(
     price: {
       type: Number,
       required: true,
+      min: 0,
+    },
+
+    offerPrice: {
+      type: Number,
+      default: null,
       min: 0,
     },
 

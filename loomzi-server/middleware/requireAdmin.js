@@ -32,6 +32,10 @@ const requireAdmin = async (req, res, next) => {
       });
     }
 
+    if (req.session.adminCredentialVersion !== (admin.credentialVersion ?? 0)) {
+      return res.status(401).json({ message: "Session expired. Please log in again." });
+    }
+
     req.admin = admin;
 
     next();

@@ -1,0 +1,204 @@
+
+.order-details-page {
+  min-height: 80vh;
+  background: #fffaf5;
+  padding: 50px 20px;
+}
+
+.order-details-container {
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.order-details-back {
+  display: inline-block;
+  margin-bottom: 25px;
+  color: #8b6049;
+  text-decoration: none;
+}
+
+.order-details-container h1 {
+  font-family: Georgia, serif;
+  color: #51392e;
+  font-size: 36px;
+}
+
+.order-details-number {
+  color: #77675e;
+  margin: 12px 0 25px;
+  overflow-wrap: anywhere;
+}
+
+.order-details-status {
+  background: #edf5ed;
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 25px;
+}
+
+.order-details-status p {
+  margin: 7px 0;
+  color: #397449;
+}
+
+.order-details-section {
+  background: white;
+  padding: 25px;
+  margin-bottom: 22px;
+  border: 1px solid #eee5dc;
+  border-radius: 14px;
+}
+
+.order-details-section h2 {
+  color: #51392e;
+  font-size: 21px;
+  margin-bottom: 20px;
+}
+
+.order-details-section p {
+  color: #77675e;
+  margin: 7px 0;
+  line-height: 1.6;
+}
+
+.order-details-product {
+  display: flex;
+  gap: 18px;
+  padding: 15px 0;
+  border-bottom: 1px solid #eee5dc;
+}
+
+.order-details-product img {
+  width: 90px;
+  height: 110px;
+  object-fit: cover;
+  border-radius: 10px;
+}
+
+.order-details-product h3 {
+  color: #51392e;
+  font-size: 16px;
+}
+
+.order-details-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 15px;
+  margin: 14px 0;
+  color: #66574e;
+}
+
+.order-details-total {
+  border-top: 1px solid #eee5dc;
+  padding-top: 16px;
+  font-size: 18px;
+  color: #51392e;
+}
+
+@media (max-width: 600px) {
+  .order-details-page {
+    padding: 30px 15px;
+  }
+
+  .order-details-container h1 {
+    font-size: 29px;
+  }
+
+  .order-details-section {
+    padding: 18px;
+  }
+}
+
+
+.order-tracking-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 10px 0;
+}
+
+.order-tracking-step {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  min-height: 55px;
+  color: #a69a91;
+  font-weight: 500;
+}
+
+.order-tracking-step.completed {
+  color: #397449;
+}
+
+.order-tracking-dot {
+  width: 28px;
+  height: 28px;
+  border: 2px solid #d5ccc5;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.order-tracking-step.completed .order-tracking-dot {
+  background: #397449;
+  border-color: #397449;
+  color: white;
+}
+
+.order-cancelled-message {
+  background: #fff0ee;
+  border: 1px solid #f1c8c2;
+  border-radius: 12px;
+  padding: 20px;
+}
+
+.order-cancelled-message h3 {
+  color: #b33b32;
+  margin-bottom: 8px;
+}
+
+.order-cancelled-message p {
+  color: #80504a;
+}
+
+
+.order-cancel-actions {
+  margin: 20px 0;
+}
+
+.order-cancel-button {
+  background: #ffffff;
+  border: 1px solid #b33b32;
+  color: #b33b32;
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.order-cancel-button:hover:not(:disabled) {
+  background: #fff0ee;
+}
+
+.order-cancel-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.order-cancel-error {
+  color: #b33b32;
+  margin: 12px 0;
+}
+
+.order-cancel-success {
+  color: #397449;
+  margin: 12px 0;
+}
+
+.loomzi-delivery-history{padding-left:22px;border-left:2px solid #e7c5d0;margin-left:10px}.loomzi-delivery-history li{padding:5px 0 15px 8px}.loomzi-delivery-history p{margin:4px 0;color:#755b67}
+
+.order-product-review-action { margin-top:12px; }
+.order-write-review { display:inline-block; background:#8c593f; color:#fff; text-decoration:none; padding:9px 15px; border-radius:7px; font-size:13px; font-weight:600; transition:background .2s ease,transform .2s ease; }
+.order-write-review:hover,.order-write-review:focus-visible { background:#68402d; transform:translateY(-2px); }

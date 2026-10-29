@@ -1,3 +1,4 @@
+import AnnouncementBar from "../components/AnnouncementBar/AnnouncementBar";
 
 import Slider from "../components/Slider/Slider";
 import CategorySelection from "../components/CategorySelection/CategorySelection";
@@ -11,6 +12,7 @@ function Home () {
   return (
     <>
     <Slider />
+    <AnnouncementBar />
     <CategorySelection />
     <ProductSelection />
     <AboutUs />

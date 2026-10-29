@@ -228,3 +228,40 @@
     grid-template-columns: 1fr;
   }
 }
+
+.product-price-section {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.product-offer-tag {
+  display: inline-block;
+  background-color: #d62828;
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 5px 10px;
+  border-radius: 5px;
+}
+
+.product-price-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.product-original-price {
+  color: #999999;
+  font-size: 15px;
+  text-decoration: line-through;
+}
+
+.product-offer-price {
+  color: #222222;
+  font-size: 19px;
+  font-weight: 700;
+}

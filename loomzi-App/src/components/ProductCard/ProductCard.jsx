@@ -1,7 +1,8 @@
-
 import { useEffect, useState } from "react";
 import { FaHeart, FaPlus } from "react-icons/fa";
 import { Link, useNavigate } from "react-router-dom";
+import ProductPrice from "../ProductPrice/ProductPrice";
+import ProductRating from "../ProductRating/ProductRating";
 
 import {
   getWishlist,
@@ -10,8 +11,9 @@ import {
 } from "../../services/wishlistApi";
 
 import "./ProductCard.css";
+import "../ProductPrice/OfferTag.css";
 
-function ProductCard({ product }) {
+function ProductCard({ product, ratingSummary }) {
   const navigate = useNavigate();
 
   const [isFavorite, setIsFavorite] = useState(false);
@@ -24,15 +26,20 @@ function ProductCard({ product }) {
 
   const totalStock = hasVariants
     ? product.variants.reduce(
-        (total, variant) =>
-          total + Number(variant.stock || 0),
-        0
+        (total, variant) => total + Number(variant.stock || 0),
+        0,
       )
     : Number(product.stock || 0);
 
   const isOutOfStock = totalStock <= 0;
 
-  // Check whether this product is already saved
+  // Active offer details from backend
+  const appliedOffer = product.appliedOffer;
+  const hasAppliedOffer = Boolean(appliedOffer?.name);
+
+  const discountPercentage = Number(appliedOffer?.discountPercentage);
+
+  // Check whether product is in wishlist
   useEffect(() => {
     let active = true;
 
@@ -42,7 +49,7 @@ function ProductCard({ product }) {
 
         if (active) {
           const exists = (data.products || []).some(
-            (item) => item._id === productId
+            (item) => item._id === productId,
           );
 
           setIsFavorite(exists);
@@ -60,17 +67,11 @@ function ProductCard({ product }) {
       checkWishlist();
     };
 
-    window.addEventListener(
-      "loomzi:wishlist-updated",
-      refreshWishlist
-    );
+    window.addEventListener("loomzi:wishlist-updated", refreshWishlist);
 
     return () => {
       active = false;
-      window.removeEventListener(
-        "loomzi:wishlist-updated",
-        refreshWishlist
-      );
+      window.removeEventListener("loomzi:wishlist-updated", refreshWishlist);
     };
   }, [productId]);
 
@@ -88,9 +89,7 @@ function ProductCard({ product }) {
         setIsFavorite(true);
       }
 
-      window.dispatchEvent(
-        new Event("loomzi:wishlist-updated")
-      );
+      window.dispatchEvent(new Event("loomzi:wishlist-updated"));
     } catch (error) {
       if (error.status === 401) {
         navigate("/login");
@@ -103,38 +102,40 @@ function ProductCard({ product }) {
   };
 
   const handleAddToCart = () => {
-    // Product variants may require size/color selection.
     navigate(`/products/${productId}`);
   };
 
   return (
     <article className="loomzi-product-card">
       <div className="loomzi-product-image">
+        {product.appliedOffer?.name && (
+          <div className="loomzi-image-offer-tag">
+            <span className="loomzi-image-offer-name">
+              {product.appliedOffer.name}
+            </span>
+
+            {Number(product.appliedOffer.discountPercentage) > 0 && (
+              <span className="loomzi-image-offer-discount">
+                {product.appliedOffer.discountPercentage}% OFF
+              </span>
+            )}
+          </div>
+        )}
         <Link to={`/products/${productId}`}>
           {productImage ? (
-            <img
-              src={productImage}
-              alt={product.name}
-              loading="lazy"
-            />
+            <img src={productImage} alt={product.name} loading="lazy" />
           ) : (
-            <div className="loomzi-no-image">
-              No Image Available
-            </div>
+            <div className="loomzi-no-image">No Image Available</div>
           )}
         </Link>
 
         {isOutOfStock && (
-          <span className="loomzi-stock-badge">
-            Out of Stock
-          </span>
+          <span className="loomzi-stock-badge">Out of Stock</span>
         )}
 
         <button
           type="button"
-          className={`loomzi-wishlist ${
-            isFavorite ? "active" : ""
-          }`}
+          className={`loomzi-wishlist ${isFavorite ? "active" : ""}`}
           onClick={handleWishlist}
           disabled={wishlistLoading}
           aria-label={
@@ -159,21 +160,16 @@ function ProductCard({ product }) {
         </h3>
 
         <div className="loomzi-product-category">
-          {product.category?.name ||
-            "Loomzi Collection"}
+          {product.category?.name || "Loomzi Collection"}
         </div>
 
+
+        <ProductRating averageRating={ratingSummary?.averageRating} count={ratingSummary?.count} />
+
         <div className="loomzi-product-bottom">
+          {/* Regular Price + Offer Price */}
           <div className="loomzi-price">
-            <strong>
-              ₹{Number(product.price).toLocaleString(
-                "en-IN",
-                {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2,
-                }
-              )}
-            </strong>
+            <ProductPrice product={product} />
           </div>
 
           <button

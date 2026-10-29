@@ -1,0 +1,4 @@
+.loomzi-rating { display:flex; align-items:center; flex-wrap:wrap; gap:7px; margin:8px 0 10px; font-size:13px; }
+.loomzi-rating-stars { display:inline-flex; gap:2px; color:#d1c7ba; font-size:16px; line-height:1; }
+.loomzi-rating-stars .filled { color:#d5a347; }
+.loomzi-rating-text { color:#777; font-size:12px; }

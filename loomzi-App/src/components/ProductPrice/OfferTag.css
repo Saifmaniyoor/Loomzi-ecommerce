@@ -1,0 +1,27 @@
+.loomzi-offer-tags {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 10px 0 12px;
+}
+
+.loomzi-offer-name,
+.loomzi-offer-percent {
+  display: inline-block;
+  padding: 5px 10px;
+  border-radius: 5px;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.loomzi-offer-name {
+  background: #ff0000;
+  color: #ffffff;
+}
+
+.loomzi-offer-percent {
+  background: #e8f5e9;
+  color: #28753b;
+}

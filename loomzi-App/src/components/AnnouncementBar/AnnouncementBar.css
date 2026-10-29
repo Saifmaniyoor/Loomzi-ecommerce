@@ -1,0 +1,778 @@
+
+/* ==========================================
+   LOOMZI ANNOUNCEMENT BAR
+========================================== */
+
+.loomzi-announcement {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  background: #fff8f0;
+  border-bottom: 0;
+  font-family: inherit;
+}
+
+.announcement-container {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 0;
+
+  display: grid;
+  grid-template-columns: 50% 50%;
+  height: 135px;
+  overflow: hidden;
+}
+
+/* ==========================================
+   OFFER SECTION
+========================================== */
+
+.announcement-offer {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+
+  display: flex;
+  align-items: center;
+
+  padding: 12px 35px;
+
+  background-color: #b47;
+  background-size: cover;
+  background-position: center center;
+  background-repeat: no-repeat;
+
+  color: #ffffff;
+  isolation: isolate;
+  overflow: hidden;
+}
+
+.announcement-offer:not([style*="background-image"]) {
+  background-image: linear-gradient(
+    120deg,
+    #773a53 0%,
+    #b56d85 55%,
+    #d8a5a6 100%
+  );
+}
+
+.announcement-offer-content {
+  position: relative;
+  z-index: 2;
+
+  width: 100%;
+  min-width: 0;
+  max-width: none;
+
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 5px;
+
+  padding-right: 170px;
+}
+
+.announcement-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1.8px;
+  text-transform: uppercase;
+  color: #ffe6d7;
+}
+
+.announcement-offer-title {
+  margin: 0;
+  font-size: clamp(19px, 2.2vw, 29px);
+  font-weight: 700;
+  line-height: 1.15;
+  color: #ffffff;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.announcement-offer-description {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.35;
+  color: #fff3ec;
+}
+
+/* Shop Now button on the right */
+
+.announcement-shop-link {
+  position: absolute;
+  top: 50%;
+  right: 45px;
+  transform: translateY(-50%);
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  min-width: 130px;
+  margin: 0;
+  padding: 10px 20px;
+
+  border: 1px solid #783047;
+  border-radius: 6px;
+  background: #783047;
+  color: #ffffff;
+
+  font-size: 12px;
+  font-weight: 700;
+  text-decoration: none;
+  white-space: nowrap;
+
+  transition:
+    background 0.25s ease,
+    box-shadow 0.25s ease;
+}
+
+.announcement-shop-link:hover {
+  background: #5e2339;
+  color: #ffffff;
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.18);
+}
+
+/* ==========================================
+   CAROUSEL ARROWS
+========================================== */
+
+.announcement-arrow {
+  position: absolute;
+  top: 50%;
+  z-index: 3;
+
+  width: 30px;
+  height: 30px;
+  padding: 0;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  transform: translateY(-50%);
+
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  border-radius: 50%;
+
+  background: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+
+  font-family: Arial, sans-serif;
+  font-size: 22px;
+  font-weight: 400;
+  line-height: 1;
+
+  box-sizing: border-box;
+  cursor: pointer;
+}
+
+.announcement-arrow-prev {
+  left: 10px;
+}
+
+.announcement-arrow-next {
+  right: 10px;
+}
+
+.announcement-arrow:hover {
+  background: rgba(255, 255, 255, 0.4);
+}
+
+.announcement-arrow-prev {
+  left: 8px;
+}
+
+.announcement-arrow-next {
+  right: 8px;
+}
+
+/* ==========================================
+   CAROUSEL DOTS
+========================================== */
+
+.announcement-dots {
+  position: absolute;
+  bottom: 6px;
+  left: 50%;
+  z-index: 3;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+
+  transform: translateX(-50%);
+}
+
+.announcement-dot {
+  width: 6px;
+  height: 6px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+
+  background: rgba(255, 255, 255, 0.5);
+  cursor: pointer;
+}
+
+.announcement-dot.active {
+  width: 17px;
+  border-radius: 10px;
+  background: #ffffff;
+}
+
+/* ==========================================
+   COUPON SECTION
+========================================== */
+
+.announcement-coupon {
+  min-width: 0;
+  height: 100%;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 12px 35px;
+
+  background: #fff8f0;
+  border-left: 1px solid #ead8d1;
+  color: #71394c;
+}
+
+.announcement-coupon-content {
+  width: 100%;
+  max-width: none;
+
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-rows: auto auto auto;
+  align-items: center;
+
+  column-gap: 14px;
+  row-gap: 8px;
+  text-align: left;
+}
+
+.announcement-coupon-label {
+  grid-column: 1;
+  grid-row: 1;
+
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  color: #a15a6c;
+  white-space: nowrap;
+}
+
+.announcement-coupon-heading {
+  grid-column: 1;
+  grid-row: 2;
+
+  display: flex;
+  align-items: center;
+  gap: 7px;
+
+  font-size: 17px;
+  font-weight: 700;
+  color: #71394c;
+  white-space: nowrap;
+}
+
+.announcement-coupon-icon {
+  font-size: 18px;
+}
+
+.announcement-coupon-description {
+  grid-column: 1;
+  grid-row: 3;
+
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.4;
+  color: #85596a;
+}
+
+.announcement-copy-button {
+  grid-column: 2;
+  grid-row: 1 / 3;
+
+  width: 100%;
+  max-width: none;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+
+  padding: 10px 11px;
+
+  border: 1px dashed #bd7989;
+  border-radius: 7px;
+  background: #ffffff;
+  color: #71394c;
+
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.announcement-copy-button:hover {
+  background: #fff0ef;
+}
+
+.announcement-copy-text {
+  font-size: 10px;
+  font-weight: 600;
+  color: #a34f66;
+  white-space: nowrap;
+}
+
+.announcement-coupon-details {
+  grid-column: 2;
+  grid-row: 3;
+
+  margin: 0;
+  font-size: 10px;
+  line-height: 1.4;
+  color: #916c77;
+  text-align: center;
+}
+
+/* ==========================================
+   SINGLE SECTION
+========================================== */
+
+.announcement-offer-only,
+.announcement-coupon-only {
+  grid-template-columns: 1fr;
+}
+
+.announcement-offer-only .announcement-offer {
+  justify-content: center;
+}
+
+.announcement-offer-only
+.announcement-offer-content {
+  max-width: 900px;
+  padding-right: 210px;
+}
+
+.announcement-coupon-only .announcement-coupon {
+  border-left: none;
+}
+
+.announcement-coupon-only
+.announcement-coupon-content {
+  max-width: 600px;
+}
+
+/* ==========================================
+   TABLET
+========================================== */
+
+@media (max-width: 1100px) {
+  .announcement-container {
+    grid-template-columns: 60% 40%;
+    height: 135px;
+  }
+
+  .announcement-offer {
+    padding: 12px 30px;
+  }
+
+  .announcement-offer-content {
+    padding-right: 130px;
+  }
+
+  .announcement-shop-link {
+    min-width: 105px;
+    padding: 8px 12px;
+    font-size: 11px;
+  }
+
+  .announcement-coupon {
+    padding: 10px 20px;
+  }
+
+  .announcement-coupon-content {
+    column-gap: 8px;
+  }
+
+  .announcement-coupon-heading {
+    font-size: 14px;
+  }
+
+  .announcement-coupon-label {
+    font-size: 9px;
+    letter-spacing: 1px;
+  }
+
+  .announcement-copy-button {
+    padding: 8px;
+    font-size: 11px;
+  }
+
+  .announcement-copy-text,
+  .announcement-coupon-details {
+    font-size: 9px;
+  }
+
+  .announcement-offer-only,
+  .announcement-coupon-only {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ==========================================
+   SMALL TABLET
+========================================== */
+
+@media (max-width: 800px) {
+  .announcement-container {
+    grid-template-columns: 1fr;
+    height: auto;
+  }
+
+  .announcement-offer {
+    min-height: 125px;
+    height: auto;
+    padding: 14px 45px;
+  }
+
+  .announcement-offer-content {
+    padding-right: 135px;
+  }
+
+  .announcement-offer-title {
+    font-size: 21px;
+  }
+
+  .announcement-shop-link {
+    min-width: 110px;
+  }
+
+  .announcement-coupon {
+    height: auto;
+    min-height: 90px;
+    padding: 12px 25px;
+    border-left: none;
+    border-top: 1px solid #ead8d1;
+  }
+
+  .announcement-coupon-content {
+    max-width: 650px;
+    column-gap: 20px;
+  }
+
+  .announcement-offer-only,
+  .announcement-coupon-only {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ==========================================
+   MOBILE
+========================================== */
+
+@media (max-width: 600px) {
+  .announcement-offer {
+    min-height: 125px;
+    padding: 14px 35px 20px;
+  }
+
+  .announcement-offer-content {
+    padding-right: 95px;
+    gap: 4px;
+  }
+
+  .announcement-label {
+    font-size: 8px;
+    letter-spacing: 1px;
+  }
+
+  .announcement-offer-title {
+    font-size: 17px;
+  }
+
+  .announcement-offer-description {
+    font-size: 10px;
+  }
+
+  .announcement-shop-link {
+    min-width: 0;
+    padding: 7px 9px;
+    font-size: 10px;
+  }
+
+  .announcement-arrow {
+    width: 22px;
+    height: 22px;
+    font-size: 18px;
+  }
+
+  .announcement-arrow-prev {
+    left: 5px;
+  }
+
+  .announcement-arrow-next {
+    right: 5px;
+  }
+
+  .announcement-coupon {
+    min-height: 100px;
+    padding: 12px 14px;
+  }
+
+  .announcement-coupon-content {
+    column-gap: 10px;
+    row-gap: 6px;
+  }
+
+  .announcement-coupon-label {
+    font-size: 8px;
+    letter-spacing: 0.6px;
+  }
+
+  .announcement-coupon-heading {
+    font-size: 13px;
+    gap: 4px;
+  }
+
+  .announcement-coupon-icon {
+    font-size: 14px;
+  }
+
+  .announcement-coupon-description {
+    font-size: 10px;
+  }
+
+  .announcement-copy-button {
+    padding: 7px 8px;
+    font-size: 10px;
+    gap: 5px;
+  }
+
+  .announcement-copy-text,
+  .announcement-coupon-details {
+    font-size: 9px;
+  }
+}
+
+/* ==========================================
+   VERY SMALL MOBILE
+========================================== */
+
+@media (max-width: 375px) {
+  .announcement-offer {
+    padding-left: 28px;
+    padding-right: 28px;
+  }
+
+  .announcement-offer-content {
+    padding-right: 80px;
+  }
+
+  .announcement-offer-title {
+    font-size: 15px;
+  }
+
+  .announcement-shop-link {
+    font-size: 9px;
+    padding: 6px 7px;
+  }
+
+  .announcement-coupon {
+    padding: 10px;
+  }
+
+  .announcement-coupon-heading {
+    font-size: 12px;
+  }
+
+  .announcement-copy-button {
+    font-size: 9px;
+    padding: 6px;
+  }
+}
+
+/* ==========================================
+   REMOVE GAP BEFORE HERO
+========================================== */
+
+.loomzi-announcement {
+  margin-bottom: 0;
+}
+
+.announcement-container {
+  margin-bottom: 0;
+}
+
+.loomzi-announcement + .hero,
+.loomzi-announcement + .hero-section,
+.loomzi-announcement + .home-hero {
+  margin-top: 0;
+}
+
+/* ==========================================
+   ACCESSIBILITY
+========================================== */
+
+.announcement-shop-link:focus-visible,
+.announcement-arrow:focus-visible,
+.announcement-dot:focus-visible,
+.announcement-copy-button:focus-visible {
+  outline: 3px solid #eab76c;
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .announcement-shop-link,
+  .announcement-arrow,
+  .announcement-dot,
+  .announcement-copy-button {
+    transition: none;
+  }
+}
+
+
+/* ==========================================
+   ANNOUNCEMENT BANNER - NAVBAR ALIGNMENT
+========================================== */
+
+.loomzi-announcement {
+  width: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+/* Full-width background */
+.announcement-container {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 0;
+
+  display: grid;
+  grid-template-columns: 50% 50%;
+  height: 135px;
+}
+
+/* Offer: align left content with Navbar logo */
+.announcement-offer {
+  padding-left: 60px;
+  padding-right: 35px;
+
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+/* Coupon: align right content with Navbar edge */
+.announcement-coupon {
+  padding-left: 35px;
+  padding-right: 60px;
+}
+
+/* Shop Now remains on right of offer content */
+.announcement-offer-content {
+  padding-right: 170px;
+}
+
+/* ==========================================
+   TABLET
+========================================== */
+
+@media (max-width: 1100px) {
+  .announcement-container {
+    grid-template-columns: 60% 40%;
+  }
+
+  .announcement-offer {
+    padding-left: 60px;
+    padding-right: 30px;
+  }
+
+  .announcement-coupon {
+    padding-left: 20px;
+    padding-right: 60px;
+  }
+}
+
+/* ==========================================
+   MOBILE / TABLET
+========================================== */
+
+@media (max-width: 768px) {
+  .announcement-container {
+    grid-template-columns: 1fr;
+    height: auto;
+  }
+
+  .announcement-offer {
+    min-height: 125px;
+    height: auto;
+    padding: 14px 35px 20px 15px;
+  }
+
+  .announcement-offer-content {
+    padding-right: 110px;
+  }
+
+  .announcement-coupon {
+    height: auto;
+    min-height: 100px;
+    padding: 12px 15px;
+    border-left: none;
+    border-top: 1px solid #ead8d1;
+  }
+}
+
+/* ==========================================
+   SMALL MOBILE
+========================================== */
+
+@media (max-width: 480px) {
+  .announcement-offer {
+    padding-left: 10px;
+    padding-right: 25px;
+  }
+
+  .announcement-offer-content {
+    padding-right: 95px;
+  }
+
+  .announcement-coupon {
+    padding-left: 10px;
+    padding-right: 10px;
+  }
+}
+
+@media (max-width: 768px) {
+  .announcement-shop-link {
+    right: 35px;
+  }
+
+  .announcement-offer-content {
+    padding-right: 135px;
+  }
+}
+
+@media (max-width: 480px) {
+  .announcement-shop-link {
+    right: 30px;
+  }
+
+  .announcement-offer-content {
+    padding-right: 115px;
+  }
+}

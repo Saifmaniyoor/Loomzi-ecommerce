@@ -1,6 +1,6 @@
 
 import { useEffect, useMemo, useState } from "react";
-import { Link, useParams, useNavigate } from "react-router-dom";
+import { Link, useParams, useNavigate, useSearchParams } from "react-router-dom";
 
 import {
   FaHeart,
@@ -11,6 +11,9 @@ import {
 } from "react-icons/fa";
 
 import ProductCard from "../../components/ProductCard/ProductCard";
+import ProductReviews from "../../components/ProductReviews/ProductReviews";
+import ProductRating from "../../components/ProductRating/ProductRating";
+import { getRatingSummaries } from "../../services/reviewApi";
 import { addToCart } from "../../services/cartApi";
 
 import {
@@ -20,6 +23,7 @@ import {
 } from "../../services/wishlistApi";
 
 import "./ProductDetails.css";
+import "../../components/ProductPrice/OfferTag.css";
 
 const API_URL = "http://localhost:5000";
 
@@ -28,11 +32,14 @@ const tabs = ["Description", "Size Guide", "Reviews"];
 function ProductDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const openReviews = searchParams.get("tab") === "reviews";
 
   // ===============================
   // Product States
   // ===============================
   const [product, setProduct] = useState(null);
+  const [ratingSummary, setRatingSummary] = useState(null);
   const [relatedProducts, setRelatedProducts] = useState([]);
 
   const [loading, setLoading] = useState(true);
@@ -94,7 +101,7 @@ function ProductDetails() {
         setSelectedColor("");
         setQuantity(1);
         setFavorite(false);
-        setActiveTab("Description");
+        setActiveTab(openReviews ? "Reviews" : "Description");
         setCartError("");
         setWishlistError("");
 
@@ -132,6 +139,13 @@ function ProductDetails() {
     fetchProductDetails();
 
     return () => controller.abort();
+  }, [id, openReviews]);
+
+  useEffect(() => {
+    let active = true;
+    setRatingSummary(null);
+    if (id) getRatingSummaries([id]).then(data => { if (active) setRatingSummary(data.ratings?.[id]); }).catch(console.error);
+    return () => { active = false; };
   }, [id]);
 
   // ===============================
@@ -283,10 +297,60 @@ function ProductDetails() {
   // ===============================
   // 5. Price and Stock
   // ===============================
-  const displayPrice =
-    selectedVariant?.price != null
-      ? Number(selectedVariant.price)
-      : Number(product?.price || 0);
+  // Prefer backend-calculated prices when available. For raw product
+  // documents, price is regular and offerPrice is the manual offer.
+  const getPricing = (item) => {
+    const regular = Number(
+      item?.regularPrice ?? item?.originalPrice ?? item?.price ?? 0
+    );
+    const backendFinal = item?.finalPrice;
+    const manualOffer = item?.offerPrice;
+    const final = backendFinal != null
+      ? Number(backendFinal)
+      : manualOffer != null && Number(manualOffer) < regular
+        ? Number(manualOffer)
+        : Number(item?.price ?? 0);
+
+    return {
+      regular: Number.isFinite(regular) ? regular : 0,
+      final: Number.isFinite(final) ? final : regular,
+    };
+  };
+
+  const productPricing = getPricing(product);
+  const selectedPricing = selectedVariant
+    ? (() => {
+        const variantRegular = Number(
+          selectedVariant.regularPrice ??
+          selectedVariant.originalPrice ??
+          selectedVariant.price ??
+          product?.regularPrice ??
+          product?.originalPrice ??
+          product?.price ?? 0
+        );
+        const variantFinal = selectedVariant.finalPrice != null
+          ? Number(selectedVariant.finalPrice)
+          : selectedVariant.offerPrice != null &&
+              Number(selectedVariant.offerPrice) < variantRegular
+            ? Number(selectedVariant.offerPrice)
+            : selectedVariant.price != null
+              ? variantRegular
+              : productPricing.final;
+        return { regular: variantRegular, final: variantFinal };
+      })()
+    : productPricing;
+
+  // Show product pricing until a customer finishes selecting a variant.
+  const shownPricing = selectedColor &&
+    (selectedSize || !variants.some((v) => v.size)) && selectedVariant
+      ? selectedPricing
+      : productPricing;
+
+  const formatPrice = (value) =>
+    Number(value).toLocaleString("en-IN", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
 
   const availableStock = hasVariants
     ? Number(selectedVariant?.stock || 0)
@@ -466,15 +530,35 @@ function ProductDetails() {
           {/* Product Information */}
           <div className="pd-information">
             <h1>{product.name}</h1>
+            <ProductRating averageRating={ratingSummary?.averageRating} count={ratingSummary?.count} />
+
+            {/* Display the active backend-applied offer */}
+            {product.appliedOffer?.name && (
+              <div className="loomzi-offer-tags">
+                <span className="loomzi-offer-name">
+                  {product.appliedOffer.name}
+                </span>
+                {Number.isFinite(Number(product.appliedOffer.discountPercentage)) &&
+                  Number(product.appliedOffer.discountPercentage) > 0 && (
+                    <span className="loomzi-offer-percent">
+                      {product.appliedOffer.discountPercentage}% OFF
+                    </span>
+                  )}
+              </div>
+            )}
 
             <div className="pd-price-rating">
-              <strong>
-                ₹
-                {displayPrice.toLocaleString("en-IN", {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2,
-                })}
-              </strong>
+              <div className="loomzi-product-price">
+                <span className="loomzi-final-price">
+                  ₹{formatPrice(shownPricing.final)}
+                </span>
+
+                {shownPricing.final < shownPricing.regular && (
+                  <span className="loomzi-regular-price">
+                    ₹{formatPrice(shownPricing.regular)}
+                  </span>
+                )}
+              </div>
             </div>
 
             <p className="pd-intro">
@@ -719,12 +803,7 @@ function ProductDetails() {
 
           {activeTab === "Reviews" && (
             <div className="pd-tab-panel">
-              <h3>Customer Reviews</h3>
-              <p>
-                Customer reviews will appear here
-                once the reviews module is
-                implemented.
-              </p>
+              <ProductReviews productId={id} />
             </div>
           )}
         </section>

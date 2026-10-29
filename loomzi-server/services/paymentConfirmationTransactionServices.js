@@ -2,6 +2,7 @@
 const mongoose = require("mongoose");
 
 const Order = require("../models/Order");
+const Cart = require("../models/Cart");
 
 const CheckoutAttempt = require(
   "../models/CheckoutAttempt"
@@ -368,7 +369,44 @@ const confirmCapturedPaymentTransaction = async ({
       }
 
       // ==========================================
-      // 12. RETURN CONFIRMATION RESULT
+      // 12. REMOVE ONLY PURCHASED CART LINES
+      // ==========================================
+      // Order payment, stock completion and cart update commit together.
+      // Do not empty the whole cart: customer may have added new products.
+      const cart = await Cart.findOne({ user: userId }).session(session);
+      if (cart && cart.items.length) {
+        const purchased = new Map(
+          order.items.map((item) => [
+            `${String(item.product)}:${item.variantId ? String(item.variantId) : ""}`,
+            Number(item.quantity),
+          ])
+        );
+
+        // Remove only an exact matching line. If its quantity changed,
+        // leave it alone rather than deleting newly added merchandise.
+        const remainingItems = cart.items.filter((item) => {
+          const key = `${String(item.product)}:${item.variantId ? String(item.variantId) : ""}`;
+          return !purchased.has(key) || Number(item.quantity) !== purchased.get(key);
+        });
+
+        if (remainingItems.length !== cart.items.length) {
+          const updatedCart = await Cart.updateOne(
+            { _id: cart._id, user: userId, __v: cart.__v },
+            {
+              $set: { items: remainingItems },
+              $inc: { __v: 1 },
+              $currentDate: { updatedAt: true },
+            },
+            { session }
+          );
+          if (updatedCart.matchedCount !== 1) {
+            throw new Error("Cart changed during payment confirmation; retry reconciliation");
+          }
+        }
+      }
+
+      // ==========================================
+      // 13. RETURN CONFIRMATION RESULT
       // ==========================================
 
       result = {

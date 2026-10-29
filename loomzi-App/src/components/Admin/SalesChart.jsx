@@ -11,33 +11,20 @@ import {
   Legend,
 } from "recharts";
 
-const chartData = [
-  { month: "Jan", sales: 4500, orders: 45 },
-  { month: "Feb", sales: 6200, orders: 62 },
-  { month: "Mar", sales: 5800, orders: 58 },
-  { month: "Apr", sales: 8500, orders: 85 },
-  { month: "May", sales: 7200, orders: 72 },
-  { month: "Jun", sales: 10500, orders: 105 },
-  { month: "Jul", sales: 9200, orders: 92 },
-  { month: "Aug", sales: 12800, orders: 128 },
-  { month: "Sep", sales: 11500, orders: 115 },
-  { month: "Oct", sales: 14285, orders: 142 },
-];
-
-function SalesChart() {
+function SalesChart({ data = [] }) {
   return (
     <section className="loomzi-chart-card">
       <div className="loomzi-section-heading">
         <div>
           <h2>Sales Overview</h2>
-          <p>Monthly sales performance (sample data)</p>
+          <p>Monthly sales performance (actual orders)</p>
         </div>
       </div>
 
       <div className="loomzi-chart-container">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart
-            data={chartData}
+            data={data}
             margin={{ top: 10, right: 15, left: 0, bottom: 5 }}
           >
             <CartesianGrid

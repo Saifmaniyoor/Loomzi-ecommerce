@@ -42,6 +42,7 @@ const validateProductData = (data) => {
     description,
     category,
     price,
+    offerPrice,
     images,
     sizeType,
     variants,
@@ -73,6 +74,18 @@ const validateProductData = (data) => {
     price < 0
   ) {
     return "Price must be a valid non-negative number";
+  }
+
+  // Optional manual offer price (null means no manual offer).
+  if (offerPrice !== undefined && offerPrice !== null) {
+    if (
+      typeof offerPrice !== "number" ||
+      !Number.isFinite(offerPrice) ||
+      offerPrice < 0 ||
+      offerPrice >= price
+    ) {
+      return "Offer Price must be a valid number lower than Regular Price";
+    }
   }
 
   // Images
@@ -237,6 +250,7 @@ const addProduct = async (req, res) => {
       description,
       category,
       price,
+      offerPrice = null,
       images = [],
       sizeType,
       variants = [],
@@ -248,6 +262,7 @@ const addProduct = async (req, res) => {
       description,
       category,
       price,
+      offerPrice,
       images,
       sizeType,
       variants,
@@ -412,6 +427,7 @@ const editProduct = async (req, res) => {
       "description",
       "category",
       "price",
+      "offerPrice",
       "images",
       "sizeType",
       "variants",

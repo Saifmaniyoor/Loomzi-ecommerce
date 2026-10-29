@@ -47,6 +47,8 @@ const userSchema = new mongoose.Schema(
       default: null,
     },
 
+    otpResendAvailableAt: { type: Date, default: null },
+
     resetOtp: {
       type: String,
       default: null,

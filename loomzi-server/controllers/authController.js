@@ -117,7 +117,8 @@ const registerUser = async (req, res) => {
 
     // 9. OTP expires in 5 minutes
 
-    const otpExpires = new Date(Date.now() + 30 * 60 * 1000);
+    const otpExpires = new Date(Date.now() + 5 * 60 * 1000);
+    const otpResendAvailableAt = otpExpires;
 
     // 10. Hash OTP
 
@@ -139,6 +140,7 @@ const registerUser = async (req, res) => {
       otp: hashedOtp,
 
       otpExpires,
+      otpResendAvailableAt,
 
       isVerified: false,
     });
@@ -186,6 +188,7 @@ const registerUser = async (req, res) => {
 
         isVerified: user.isVerified,
       },
+      resendAvailableAt: otpResendAvailableAt.toISOString(),
     });
   } catch (error) {
     console.error("REGISTRATION ERROR:", error);
@@ -290,6 +293,48 @@ const verifyOtp = async (req, res) => {
 // LOGIN USER WITH SESSION
 
 // =====================================
+
+// Resend verification OTP. The database condition prevents concurrent early requests.
+const resendOtp = async (req, res) => {
+  try {
+    const email = typeof req.body?.email === "string" ? req.body.email.trim().toLowerCase() : "";
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return res.status(400).json({ message: "Valid email is required" });
+    }
+    const User = require("../models/User");
+    const now = new Date();
+    const nextAllowed = new Date(now.getTime() + 5 * 60 * 1000);
+    const otp = crypto.randomInt(100000, 1000000).toString();
+    const hashedOtp = await bcrypt.hash(otp, 10);
+    const user = await User.findOneAndUpdate(
+      { email, isVerified: false,
+        $or: [{ otpResendAvailableAt: { $lte: now } }, { otpResendAvailableAt: null }] },
+      { $set: { otp: hashedOtp, otpExpires: nextAllowed, otpResendAvailableAt: nextAllowed } },
+      { new: true }
+    );
+    if (!user) {
+      const existing = await User.findOne({ email });
+      if (!existing) return res.status(404).json({ message: "User not found" });
+      if (existing.isVerified) return res.status(400).json({ message: "Email already verified" });
+      const remaining = Math.max(1, Math.ceil((new Date(existing.otpResendAvailableAt).getTime() - Date.now()) / 1000));
+      res.set("Retry-After", String(remaining));
+      return res.status(429).json({ message: "Please wait before resending OTP", retryAfterSeconds: remaining,
+        resendAvailableAt: existing.otpResendAvailableAt });
+    }
+    try {
+      await transporter.sendMail({ from: process.env.EMAIL_USER, to: email,
+        subject: "Verify your Loomzi account",
+        text: `Your Loomzi verification code is ${otp}. This code will expire in 5 minutes.` });
+    } catch (err) {
+      console.error("RESEND OTP EMAIL ERROR:", err);
+      return res.status(502).json({ message: "Unable to send OTP email. Please try again later.", resendAvailableAt: nextAllowed });
+    }
+    return res.status(200).json({ message: "A new OTP has been sent", resendAvailableAt: nextAllowed.toISOString() });
+  } catch (error) {
+    console.error("RESEND OTP ERROR:", error);
+    return res.status(500).json({ message: "Server error" });
+  }
+};
 
 const loginUser = async (req, res) => {
   try {
@@ -794,6 +839,7 @@ const resetPassword = async (req, res) => {
 // =====================================
 
 module.exports = {
+  resendOtp,
   registerUser,
 
   verifyOtp,

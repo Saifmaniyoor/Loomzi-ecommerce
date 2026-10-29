@@ -1,6 +1,6 @@
 
 import { useCallback, useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 import {
   getCart,
@@ -8,8 +8,6 @@ import {
   removeCartItem,
   clearCart,
 } from "../../services/cartApi";
-
-import { validateCoupon } from "../../services/couponApi";
 
 import "./Cart.css";
 
@@ -36,17 +34,14 @@ const normalizeCart = (response) => {
 };
 
 function Cart() {
+  const navigate = useNavigate();
+
   const [cart, setCart] = useState(null);
   const [loading, setLoading] = useState(true);
   const [busyItemId, setBusyItemId] = useState(null);
+  const [removingItemId, setRemovingItemId] = useState(null);
   const [clearing, setClearing] = useState(false);
   const [error, setError] = useState("");
-
-  // Coupon states
-  const [couponCode, setCouponCode] = useState("");
-  const [appliedCoupon, setAppliedCoupon] = useState(null);
-  const [couponError, setCouponError] = useState("");
-  const [couponLoading, setCouponLoading] = useState(false);
 
   const fetchCart = useCallback(async () => {
     try {
@@ -64,22 +59,6 @@ function Cart() {
     fetchCart();
   }, [fetchCart]);
 
-  // Revalidate an applied coupon whenever the cart changes.
-  const refreshAppliedCoupon = async (code) => {
-    if (!code) return;
-
-    try {
-      const result = await validateCoupon(code);
-      setAppliedCoupon(result);
-      setCouponError("");
-    } catch (err) {
-      setAppliedCoupon(null);
-      setCouponError(
-        err.message || "Coupon is no longer valid"
-      );
-    }
-  };
-
   const handleQuantityChange = async (item, change) => {
     const newQuantity = item.quantity + change;
 
@@ -95,7 +74,6 @@ function Cart() {
     try {
       setBusyItemId(item.itemId);
       setError("");
-      setAppliedCoupon(null);
 
       await updateCartQuantity(
         item.itemId,
@@ -103,13 +81,6 @@ function Cart() {
       );
 
       await fetchCart();
-
-      if (appliedCoupon?.coupon?.code) {
-        await refreshAppliedCoupon(
-          appliedCoupon.coupon.code
-        );
-      }
-
       notifyCartUpdated();
     } catch (err) {
       setError(
@@ -121,23 +92,13 @@ function Cart() {
   };
 
   const handleRemove = async (itemId) => {
-    const previousCouponCode =
-      appliedCoupon?.coupon?.code;
-
     try {
       setBusyItemId(itemId);
       setError("");
-      setAppliedCoupon(null);
+      setRemovingItemId(itemId);
 
       await removeCartItem(itemId);
       await fetchCart();
-
-      if (previousCouponCode) {
-        await refreshAppliedCoupon(
-          previousCouponCode
-        );
-      }
-
       notifyCartUpdated();
     } catch (err) {
       setError(
@@ -145,6 +106,7 @@ function Cart() {
       );
     } finally {
       setBusyItemId(null);
+      setRemovingItemId(null);
     }
   };
 
@@ -160,11 +122,6 @@ function Cart() {
       setError("");
 
       await clearCart();
-
-      setAppliedCoupon(null);
-      setCouponCode("");
-      setCouponError("");
-
       await fetchCart();
       notifyCartUpdated();
     } catch (err) {
@@ -176,66 +133,15 @@ function Cart() {
     }
   };
 
-  const handleApplyCoupon = async (event) => {
-    event.preventDefault();
-
-    const code = couponCode.trim().toUpperCase();
-
-    if (!code) {
-      setCouponError("Please enter a coupon code");
-      return;
-    }
-
-    try {
-      setCouponLoading(true);
-      setCouponError("");
-      setAppliedCoupon(null);
-
-      const result = await validateCoupon(code);
-
-      setAppliedCoupon(result);
-      setCouponCode(result.coupon.code);
-    } catch (err) {
-      setCouponError(
-        err.message || "Unable to apply coupon"
-      );
-    } finally {
-      setCouponLoading(false);
-    }
-  };
-
-  const handleRemoveCoupon = () => {
-    setAppliedCoupon(null);
-    setCouponCode("");
-    setCouponError("");
-  };
-
   const items = cart?.items || [];
 
-  const isBusy =
-    busyItemId !== null ||
-    clearing ||
-    couponLoading;
+  const isBusy = busyItemId !== null || clearing;
 
   const hasUnavailableItems =
     cart?.hasUnavailableItems ||
     items.some((item) => item.available === false);
 
-  // The validated response is only a preview.
-  const discount = Number(
-    appliedCoupon?.discount ?? 0
-  );
-
-  const finalTotal = appliedCoupon
-    ? Number(appliedCoupon.finalTotal)
-    : Number(cart?.total ?? 0);
-
-  const minimumPurchase = 500;
-
-  const remainingAmount = Math.max(
-    0,
-    minimumPurchase - Number(cart?.subtotal ?? 0)
-  );
+  const finalTotal = Number(cart?.total ?? 0);
 
   if (loading) {
     return (
@@ -305,15 +211,30 @@ function Cart() {
                 const itemId =
                   item.itemId ?? item._id;
 
-                const busy =
-                  busyItemId === itemId;
-
                 const stock = Number(
                   item.stock ?? 0
                 );
 
                 const isAvailable =
                   item.available !== false;
+
+                const regularPrice = Number(
+                  item.originalPrice ?? item.price ?? 0
+                );
+
+                const finalPrice = Number(
+                  item.price ?? 0
+                );
+
+                const hasDiscount =
+                  isAvailable &&
+                  Number.isFinite(regularPrice) &&
+                  Number.isFinite(finalPrice) &&
+                  regularPrice > finalPrice;
+
+                const offerPercentage = Number(
+                  item.appliedOffer?.discountPercentage ?? 0
+                );
 
                 return (
                   <article
@@ -352,6 +273,7 @@ function Cart() {
                               Color: {item.color}
                             </span>
                           )}
+
                           {item.size && (
                             <span>
                               Size: {item.size}
@@ -361,9 +283,31 @@ function Cart() {
                       )}
 
                       {item.price != null && (
-                        <p className="cart-item-price">
-                          {formatPrice(item.price)}
-                        </p>
+                        <div className="cart-item-price cart-offer-prices">
+                          <span className="cart-final-price">
+                            {formatPrice(item.price)}
+                          </span>
+
+                          {hasDiscount && (
+                            <span className="cart-regular-price">
+                              {formatPrice(regularPrice)}
+                            </span>
+                          )}
+                        </div>
+                      )}
+
+                      {hasDiscount && item.appliedOffer?.name && (
+                        <div className="cart-offer-tags">
+                          <span className="cart-offer-name">
+                            {item.appliedOffer.name}
+                          </span>
+
+                          {offerPercentage > 0 && (
+                            <span className="cart-offer-percent">
+                              {offerPercentage}% OFF
+                            </span>
+                          )}
+                        </div>
                       )}
 
                       {!isAvailable && (
@@ -422,7 +366,9 @@ function Cart() {
                             handleRemove(itemId)
                           }
                         >
-                          {busy ? "Removing..." : "Remove"}
+                          {removingItemId === itemId
+                            ? "Removing..."
+                            : "Remove"}
                         </button>
                       </div>
                     </div>
@@ -454,89 +400,6 @@ function Cart() {
                 </span>
               </div>
 
-              {/* Coupon section */}
-              <div className="cart-coupon-section">
-                <h3>Have a coupon?</h3>
-
-                {remainingAmount > 0 && (
-                  <p className="cart-coupon-hint">
-                    Add {formatPrice(remainingAmount)} more
-                    to unlock LOOMZI10.
-                  </p>
-                )}
-
-                <form
-                  onSubmit={handleApplyCoupon}
-                  className="cart-coupon-form"
-                >
-                  <input
-                    type="text"
-                    value={couponCode}
-                    onChange={(event) => {
-                      setCouponCode(event.target.value);
-                      setCouponError("");
-                    }}
-                    placeholder="Enter coupon code"
-                    aria-label="Coupon code"
-                    disabled={
-                      isBusy ||
-                      Boolean(appliedCoupon)
-                    }
-                  />
-
-                  {appliedCoupon ? (
-                    <button
-                      type="button"
-                      onClick={handleRemoveCoupon}
-                      disabled={isBusy}
-                    >
-                      Remove
-                    </button>
-                  ) : (
-                    <button
-                      type="submit"
-                      disabled={
-                        isBusy ||
-                        hasUnavailableItems ||
-                        remainingAmount > 0
-                      }
-                    >
-                      {couponLoading
-                        ? "Applying..."
-                        : "Apply"}
-                    </button>
-                  )}
-                </form>
-
-                {couponError && (
-                  <p
-                    className="cart-coupon-error"
-                    role="alert"
-                  >
-                    {couponError}
-                  </p>
-                )}
-
-                {appliedCoupon && (
-                  <p className="cart-coupon-success">
-                    Coupon {appliedCoupon.coupon.code}
-                    {" "}applied successfully!
-                  </p>
-                )}
-              </div>
-
-              {appliedCoupon && (
-                <div className="cart-summary-row">
-                  <span>
-                    Coupon Discount
-                    ({appliedCoupon.coupon.code})
-                  </span>
-                  <span className="cart-discount">
-                    −{formatPrice(discount)}
-                  </span>
-                </div>
-              )}
-
               <div className="cart-summary-divider" />
 
               <div className="cart-summary-row cart-grand-total">
@@ -553,11 +416,7 @@ function Cart() {
                   isBusy ||
                   hasUnavailableItems
                 }
-                onClick={() =>
-                  window.alert(
-                    "Checkout will be implemented in the next module."
-                  )
-                }
+                onClick={() => navigate("/checkout")}
               >
                 Proceed to Checkout
               </button>

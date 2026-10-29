@@ -172,15 +172,15 @@ function Navbar() {
           Shop
         </Link>
 
-        <Link to="/dresses" onClick={closeMenu}>
+        <Link to="/products?category=Dresses" onClick={closeMenu}>
           Dresses
         </Link>
 
-        <Link to="/hairbands" onClick={closeMenu}>
+        <Link to="/products?category=Hairbands" onClick={closeMenu}>
           Hairbands
         </Link>
 
-        <Link to="/crafts" onClick={closeMenu}>
+        <Link to="/products?category=Crafts" onClick={closeMenu}>
           Crafts
         </Link>
 
@@ -251,9 +251,13 @@ function Navbar() {
                     My Profile
                   </Link>
 
-                  <button type="button" className="dropdown-item" disabled>
-                    My Orders (Coming Soon)
-                  </button>
+                  <Link
+                    to="/my-orders"
+                    className="dropdown-item"
+                    onClick={closeMenu}
+                  >
+                    My Orders
+                  </Link>
 
                   <div className="dropdown-divider" />
 
@@ -297,15 +301,15 @@ function Navbar() {
             Shop
           </Link>
 
-          <Link to="/dresses" onClick={closeMenu}>
+          <Link to="/products?category=Dresses" onClick={closeMenu}>
             Dresses
           </Link>
 
-          <Link to="/hairbands" onClick={closeMenu}>
+          <Link to="/products?category=Hairbands" onClick={closeMenu}>
             Hairbands
           </Link>
 
-          <Link to="/crafts" onClick={closeMenu}>
+          <Link to="/products?category=Crafts" onClick={closeMenu}>
             Crafts
           </Link>
 

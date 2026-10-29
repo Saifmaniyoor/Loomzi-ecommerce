@@ -1,4 +1,3 @@
-//CSS file location - admin layout -- admin layout.css
 
 import { useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
@@ -15,6 +14,9 @@ import {
   List,
   PlusCircle,
   FolderTree,
+  TicketPercent,
+  Truck,
+  BadgePercent,
 } from "lucide-react";
 
 function AdminSidebar() {
@@ -69,22 +71,30 @@ function AdminSidebar() {
           <span>Dashboard</span>
         </NavLink>
 
-        {/* Expandable Product Management */}
+        {/* Product Management */}
         <button
           type="button"
           className={`loomzi-sidebar-link loomzi-sidebar-toggle ${
             isProductRoute ? "active" : ""
           }`}
-          onClick={() => setProductsOpen((previous) => !previous)}
+          onClick={() =>
+            setProductsOpen((previous) => !previous)
+          }
           aria-expanded={productsOpen}
         >
           <Package size={19} />
           <span>Product Management</span>
 
           {productsOpen ? (
-            <ChevronDown size={17} className="loomzi-sidebar-chevron" />
+            <ChevronDown
+              size={17}
+              className="loomzi-sidebar-chevron"
+            />
           ) : (
-            <ChevronRight size={17} className="loomzi-sidebar-chevron" />
+            <ChevronRight
+              size={17}
+              className="loomzi-sidebar-chevron"
+            />
           )}
         </button>
 
@@ -139,7 +149,9 @@ function AdminSidebar() {
                 key={item.name}
                 to={item.path}
                 className={({ isActive }) =>
-                  `loomzi-sidebar-link ${isActive ? "active" : ""}`
+                  `loomzi-sidebar-link ${
+                    isActive ? "active" : ""
+                  }`
                 }
               >
                 <Icon size={19} />
@@ -148,16 +160,59 @@ function AdminSidebar() {
             );
           })}
 
-        <p className="loomzi-sidebar-label">SYSTEM</p>
+        {/* Coupon Management */}
+        <NavLink
+          to="/admin/coupons"
+          className={({ isActive }) =>
+            `loomzi-sidebar-link ${
+              isActive ? "active" : ""
+            }`
+          }
+        >
+          <TicketPercent size={19} />
+          <span>Coupon Management</span>
+        </NavLink>
+
+        {/* Offer Management */}
+        <NavLink
+          to="/admin/offers"
+          className={({ isActive }) =>
+            `loomzi-sidebar-link ${
+              isActive ? "active" : ""
+            }`
+          }
+        >
+          <BadgePercent size={19} />
+          <span>Offer Management</span>
+        </NavLink>
+
+        {/* Shipping Management */}
+        <NavLink
+          to="/admin/settings/shipping"
+          className={({ isActive }) =>
+            `loomzi-sidebar-link ${
+              isActive ? "active" : ""
+            }`
+          }
+        >
+          <Truck size={19} />
+          <span>Shipping Charge</span>
+        </NavLink>
+
+        <p className="loomzi-sidebar-label">
+          SYSTEM
+        </p>
 
         <NavLink
-          to="/admin/settings"
+          to="/admin/settings/account"
           className={({ isActive }) =>
-            `loomzi-sidebar-link ${isActive ? "active" : ""}`
+            `loomzi-sidebar-link ${
+              isActive ? "active" : ""
+            }`
           }
         >
           <Settings size={19} />
-          <span>Settings</span>
+          <span>Account Settings</span>
         </NavLink>
       </nav>
     </aside>

@@ -14,66 +14,12 @@ import {
 import SalesChart from "../../../components/Admin/SalesChart";
 import "./AdminDashboard.css";
 
-const stats = [
-  {
-    title: "Total Sales",
-    value: "₹14,285.00",
-    change: "+12.5%",
-    icon: IndianRupee,
-    type: "sales",
-  },
-  {
-    title: "Total Orders",
-    value: "428",
-    change: "+5.2%",
-    icon: ShoppingBag,
-    type: "orders",
-  },
-  {
-    title: "New Customers",
-    value: "112",
-    change: "+8.1%",
-    icon: UserRoundPlus,
-    type: "customers",
-  },
-  {
-    title: "Pending Orders",
-    value: "18",
-    change: "High Priority",
-    icon: Scissors,
-    type: "pending",
-  },
-];
-
-const recentOrders = [
-  {
-    id: "#LS-9842",
-    customer: "Emily Watson",
-    date: "Oct 24, 2024",
-    amount: "₹124.00",
-    status: "Delivered",
-  },
-  {
-    id: "#LS-9841",
-    customer: "Michael Reed",
-    date: "Oct 24, 2024",
-    amount: "₹45.00",
-    status: "In Progress",
-  },
-  {
-    id: "#LS-9840",
-    customer: "Jessica Alba",
-    date: "Oct 23, 2024",
-    amount: "₹210.50",
-    status: "Shipped",
-  },
-  {
-    id: "#LS-9839",
-    customer: "David Chen",
-    date: "Oct 23, 2024",
-    amount: "₹55.00",
-    status: "In Progress",
-  },
+const currency = (n) => `₹${Number(n || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const statCards = (stats) => [
+  { title: "Total Sales", value: currency(stats.totalSales), change: "Collected", icon: IndianRupee, type: "sales" },
+  { title: "Total Orders", value: String(stats.totalOrders ?? 0), change: "Selected period", icon: ShoppingBag, type: "orders" },
+  { title: "New Customers", value: String(stats.newCustomers ?? 0), change: "Selected period", icon: UserRoundPlus, type: "customers" },
+  { title: "Pending Orders", value: String(stats.pendingOrders ?? 0), change: "Needs attention", icon: Scissors, type: "pending" },
 ];
 
 function AdminDashboard() {
@@ -83,6 +29,12 @@ function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [loggingOut, setLoggingOut] = useState(false);
   const [error, setError] = useState("");
+  const [report, setReport] = useState(null);
+  const [period, setPeriod] = useState("month");
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+  const [exporting, setExporting] = useState(false);
+  const [statsLoading, setStatsLoading] = useState(false);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -129,6 +81,40 @@ function AdminDashboard() {
 
     return () => controller.abort();
   }, [navigate]);
+
+  const query = new URLSearchParams({ period });
+  if (period === "custom") { query.set("from", from); query.set("to", to); }
+  const queryString = query.toString();
+
+  useEffect(() => {
+    if (!admin || (period === "custom" && (!from || !to))) return;
+    const controller = new AbortController();
+    setStatsLoading(true);
+    fetch(`http://localhost:5000/api/admin/dashboard/stats?${queryString}`, {
+      credentials: "include", signal: controller.signal,
+    }).then(async (r) => {
+      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).message || "Unable to load statistics");
+      return r.json();
+    }).then((data) => { setReport(data); setError(""); })
+      .catch((e) => { if (e.name !== "AbortError") setError(e.message); })
+      .finally(() => { if (!controller.signal.aborted) setStatsLoading(false); });
+    return () => controller.abort();
+  }, [admin, queryString, period, from, to]);
+
+  const exportReport = async (format) => {
+    setExporting(true); setError("");
+    try {
+      const r = await fetch(`http://localhost:5000/api/admin/dashboard/export/${format}?${queryString}`, { credentials: "include" });
+      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).message || "Export failed");
+      const blob = await r.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a"); a.href = url;
+      a.download = `loomzi-report-${period}.${format}`;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (e) { setError(e.message); }
+    finally { setExporting(false); }
+  };
 
   const handleLogout = async () => {
     setLoggingOut(true);
@@ -201,20 +187,20 @@ function AdminDashboard() {
                 Invite Vendor
               </button>
 
-              <button
-                type="button"
-                className="loomzi-export-button"
-                disabled
-                title="Report export coming soon"
-              >
-                <Download size={18} />
-                Export Report
-              </button>
+              <select aria-label="Report period" value={period} onChange={(e) => setPeriod(e.target.value)}>
+                <option value="today">Today</option><option value="week">Last 7 days</option>
+                <option value="month">Last 30 days</option><option value="year">Last year</option>
+                <option value="all">All time</option><option value="custom">Custom dates</option>
+              </select>
+              {period === "custom" && <><input aria-label="From date" type="date" value={from} onChange={(e) => setFrom(e.target.value)} /><input aria-label="To date" type="date" value={to} onChange={(e) => setTo(e.target.value)} /></>}
+              <button type="button" className="loomzi-export-button" onClick={() => exportReport("csv")} disabled={exporting || statsLoading || (period === "custom" && (!from || !to))}><Download size={18} /> Export CSV</button>
+              <button type="button" className="loomzi-export-button" onClick={() => exportReport("pdf")} disabled={exporting || statsLoading || (period === "custom" && (!from || !to))}><Download size={18} /> Export PDF</button>
             </div>
           </div>
 
+          {statsLoading && <p>Updating statistics...</p>}
           <div className="loomzi-stats-grid">
-            {stats.map((stat) => {
+            {statCards(report?.stats || {}).map((stat) => {
               const Icon = stat.icon;
 
               return (
@@ -243,13 +229,13 @@ function AdminDashboard() {
             })}
           </div>
 
-          <SalesChart />
+          <SalesChart data={report?.monthlySales || []} />
 
           <section className="loomzi-orders-card">
             <div className="loomzi-orders-heading">
               <h2>Recent Orders</h2>
               <span className="loomzi-orders-demo">
-                Sample data
+                Latest orders
               </span>
             </div>
 
@@ -267,16 +253,16 @@ function AdminDashboard() {
                 </thead>
 
                 <tbody>
-                  {recentOrders.map((order) => (
+                  {(report?.recentOrders || []).map((order) => (
                     <tr key={order.id}>
                       <td className="loomzi-order-id">
-                        {order.id}
+                        {`#${String(order.id).slice(-8).toUpperCase()}`}
                       </td>
 
                       <td>{order.customer}</td>
-                      <td>{order.date}</td>
+                      <td>{new Date(order.date).toLocaleDateString("en-IN")}</td>
                       <td className="loomzi-order-amount">
-                        {order.amount}
+                        {currency(order.amount)}
                       </td>
 
                       <td>

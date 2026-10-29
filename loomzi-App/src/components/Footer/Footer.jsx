@@ -107,7 +107,7 @@ function Footer() {
 
           <a href="/contact">Contact Us</a>
           <a href="/shipping">Shipping & Delivery</a>
-          <a href="/returns">Returns & Exchanges</a>
+          <a href="/cancellation-policy">Cancellation &amp; Returns Policy</a>
           <a href="/faq">FAQs</a>
 
         </div>

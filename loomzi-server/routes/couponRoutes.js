@@ -10,6 +10,7 @@ const {
 
 router.use(requireUser);
 
+router.get("/available", require("../controllers/availableCouponsController").availableCoupons);
 router.post("/validate", validateCoupon);
 
 module.exports = router;

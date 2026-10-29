@@ -13,21 +13,21 @@ function CategorySelection() {
       title: "Custom Dresses",
       description: "Beautiful dresses made with love for little ones.",
       image: dressesImage,
-      link: "/dresses",
+      link: "/products?category=Dresses",
     },
     {
       id: 2,
       title: "Whimsical Hairbands",
       description: "Cute and playful hairbands for every little style.",
       image: hairbandsImage,
-      link: "/hairbands",
+      link: "/products?category=Hairbands",
     },
     {
       id: 3,
       title: "Creative Crafts",
       description: "Unique handmade crafts created with care.",
       image: craftsImage,
-      link: "/crafts",
+      link: "/products?category=Crafts",
     },
   ];
 

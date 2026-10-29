@@ -4,7 +4,7 @@ import { useNavigate, useParams } from "react-router-dom";
 
 import "./AddProduct.css";
 
-const API_URL = "http\://localhost:5000";
+const API_URL = "http://localhost:5000";
 
 const AGE_SIZES = [
 
@@ -86,6 +86,8 @@ function AddProduct() {
     category: "",
 
     price: "",
+
+    offerPrice: "",
 
     sizeType: "none",
 
@@ -208,6 +210,8 @@ function AddProduct() {
             category: product.category?._id || product.category || "",
 
             price: String(product.price ?? ""),
+
+            offerPrice: product.offerPrice == null ? "" : String(product.offerPrice),
 
             sizeType: product.sizeType || "none",
 
@@ -516,6 +520,24 @@ function AddProduct() {
 
     }
 
+    const regularPrice = Number(form.price);
+    if (!Number.isFinite(regularPrice) || regularPrice <= 0) {
+      setError("Regular Price must be greater than zero.");
+      return;
+    }
+
+    if (form.offerPrice !== "") {
+      const manualOfferPrice = Number(form.offerPrice);
+      if (
+        !Number.isFinite(manualOfferPrice) ||
+        manualOfferPrice < 0 ||
+        manualOfferPrice >= regularPrice
+      ) {
+        setError("Offer Price must be lower than Regular Price.");
+        return;
+      }
+    }
+
     const payload = {
 
       name: form.name.trim(),
@@ -524,7 +546,9 @@ function AddProduct() {
 
       category: form.category,
 
-      price: Number(form.price),
+      price: regularPrice,
+
+      offerPrice: form.offerPrice === "" ? null : Number(form.offerPrice),
 
       images: form.images,
 
@@ -745,7 +769,7 @@ function AddProduct() {
 
           <div className="add-product-field">
 
-            <label htmlFor="product-price">Base Price (₹)</label>
+            <label htmlFor="product-price">Regular Price (₹)</label>
 
             <input
 
@@ -767,6 +791,22 @@ function AddProduct() {
 
             />
 
+          </div>
+
+          <div className="add-product-field">
+            <label htmlFor="product-offer-price">Offer Price (₹) — Optional</label>
+            <input
+              id="product-offer-price"
+              type="number"
+              name="offerPrice"
+              min="0"
+              max={form.price || undefined}
+              step="0.01"
+              placeholder="Leave empty for no manual offer"
+              value={form.offerPrice}
+              onChange={handleChange}
+            />
+            <small>Manual offer price must be lower than the regular price.</small>
           </div>
 
           <div className="add-product-field">

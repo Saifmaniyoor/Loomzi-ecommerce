@@ -25,11 +25,11 @@ const isSupportedImage = (buffer) => {
   return isJpeg || isPng || isWebp;
 };
 
-const uploadImage = (file) => {
+const uploadImage = (file, folder = "loomzi/products") => {
   return new Promise((resolve, reject) => {
     const stream = cloudinary.uploader.upload_stream(
       {
-        folder: "loomzi/products",
+        folder,
         resource_type: "image",
       },
       (error, result) => {
@@ -45,7 +45,7 @@ const uploadImage = (file) => {
   });
 };
 
-const uploadProductImages = async (files) => {
+const uploadProductImages = async (files, folder = "loomzi/products") => {
   if (!files?.length) {
     throw new Error("Please select at least one image.");
   }
@@ -61,7 +61,7 @@ const uploadProductImages = async (files) => {
   const uploadedImages = [];
 
   for (const file of files) {
-    const imageUrl = await uploadImage(file);
+    const imageUrl = await uploadImage(file, folder);
     uploadedImages.push(imageUrl);
   }
 

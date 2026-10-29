@@ -18,6 +18,22 @@ const getUserId = (req) => {
   return req.user?._id || req.session?.userId;
 };
 
+
+const handleCartError = (res, error, fallbackMessage) => {
+  console.error(fallbackMessage, error);
+
+  if (error.name === "VersionError") {
+    return res.status(409).json({
+      message: "Your cart was updated by another request. Please refresh your cart.",
+    });
+  }
+
+  return res.status(500).json({
+    message: fallbackMessage,
+  });
+};
+
+
 // GET /api/cart
 const getCart = async (req, res) => {
   try {
@@ -148,12 +164,12 @@ const addToCart = async (req, res) => {
       message: "Product added to cart successfully",
     });
   } catch (error) {
-    console.error("Add to cart error:", error);
-
-    return res.status(500).json({
-      message: "Failed to add product to cart",
-    });
-  }
+  return handleCartError(
+    res,
+    error,
+    "Failed to add product to cart"
+  );
+}
 };
 
 // PATCH /api/cart/items/:itemId
@@ -232,12 +248,12 @@ const updateCartItem = async (req, res) => {
       message: "Cart quantity updated successfully",
     });
   } catch (error) {
-    console.error("Update cart error:", error);
-
-    return res.status(500).json({
-      message: "Failed to update cart item",
-    });
-  }
+  return handleCartError(
+    res,
+    error,
+    "Failed to update cart item"
+  );
+}
 };
 
 // DELETE /api/cart/items/:itemId
@@ -307,12 +323,12 @@ const clearCart = async (req, res) => {
       message: "Cart cleared successfully",
     });
   } catch (error) {
-    console.error("Clear cart error:", error);
-
-    return res.status(500).json({
-      message: "Failed to clear cart",
-    });
-  }
+  return handleCartError(
+    res,
+    error,
+    "Failed to clear cart"
+  );
+}
 };
 
 module.exports = {

@@ -6,6 +6,7 @@ const router = express.Router();
 const {
   registerUser,
   verifyOtp,
+  resendOtp,
   loginUser,
   getCurrentUser,
   logoutUser,
@@ -19,6 +20,7 @@ router.post("/register", registerUser);
 
 // Verify OTP
 router.post("/verify-otp", verifyOtp);
+router.post("/resend-otp", resendOtp);
 
 // Login user
 router.post("/login", loginUser);

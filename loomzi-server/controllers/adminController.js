@@ -189,6 +189,7 @@ const loginAdmin = async (req, res) => {
 
       req.session.adminId = admin._id.toString();
       req.session.adminRole = admin.role;
+      req.session.adminCredentialVersion = admin.credentialVersion ?? 0;
 
       req.session.save((saveError) => {
         if (saveError) {
