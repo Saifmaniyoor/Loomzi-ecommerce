@@ -58,3 +58,16 @@ public/uploads/
 .cache/
 .tmp/
 *.tsbuildinfo
+
+# Deployment ZIP files
+loomzi-deploy*.zip
+
+# Generated React build
+loomzi-server/public/
+
+# Environment secrets
+.env
+.env.*
+
+# Dependencies
+node_modules/
