@@ -12,20 +12,34 @@ const {
   confirmCapturedPaymentTransaction,
 } = require("./paymentConfirmationTransactionServices");
 
-// Execute recovery for an already-claimed webhook.
+// ==========================================
+// EXECUTE WEBHOOK RECOVERY
+// ==========================================
+
+// Internal service only.
+//
+// Supports:
+// 1. Razorpay-only payments
+// 2. Wallet + Razorpay split payments
+//
+// Wallet-only orders do not use Razorpay
+// payment.captured webhook recovery.
 //
 // IMPORTANT:
-// Do not expose this function through a public API.
-// The caller must supply the current processing token.
+// Do not expose this function publicly.
+//
+// The caller must provide the current
+// webhook processing token.
+//
+// Never release wallet reservations
+// or mark payments as Failed when the
+// Razorpay payment outcome is uncertain.
 
 const executeWebhookRecovery = async ({
   eventId,
   processingToken,
 }) => {
-  // ==========================================
-  // 1. VALIDATE INPUTS
-  // ==========================================
-
+  // 1. Validate inputs
   if (
     typeof eventId !== "string" ||
     !eventId.trim() ||
@@ -40,10 +54,7 @@ const executeWebhookRecovery = async ({
   const normalizedEventId = eventId.trim();
   const normalizedToken = processingToken.trim();
 
-  // ==========================================
-  // 2. VERIFY INITIAL WEBHOOK OWNERSHIP
-  // ==========================================
-
+  // 2. Verify initial webhook ownership
   const event = await findWebhookEventById(
     normalizedEventId
   );
@@ -61,10 +72,7 @@ const executeWebhookRecovery = async ({
     };
   }
 
-  // ==========================================
-  // 3. CHECK WEBHOOK EVENT TYPE
-  // ==========================================
-
+  // 3. Check event type
   if (event.eventType !== "payment.captured") {
     const updated =
       await markWebhookEventForReconciliation({
@@ -82,18 +90,28 @@ const executeWebhookRecovery = async ({
   }
 
   try {
-    // ==========================================
-    // 4. VERIFY PAYMENT WITH RAZORPAY
-    // ==========================================
-
+    // 4. Verify payment with Razorpay
+    //
+    // evaluateWebhookRecovery() must use
+    // the updated reconciliation services.
+    //
+    // Razorpay-only:
+    //   Verify full order amount.
+    //
+    // Wallet + Razorpay:
+    //   Verify paymentBreakdown.razorpayPaise.
     const decision = await evaluateWebhookRecovery(
       normalizedEventId
     );
 
-    // ==========================================
-    // 5. HANDLE UNSUCCESSFUL VERIFICATION
-    // ==========================================
+    // 5. Validate recovery decision
+    if (!decision || typeof decision !== "object") {
+      throw new Error(
+        "Invalid webhook recovery decision"
+      );
+    }
 
+    // 6. Handle unsuccessful verification
     if (decision.requiresReconciliation) {
       const updated =
         await markWebhookEventForReconciliation({
@@ -112,18 +130,14 @@ const executeWebhookRecovery = async ({
       };
     }
 
-    // ==========================================
-    // 6. CHECK WHETHER CONFIRMATION IS ALLOWED
-    // ==========================================
-
-    // Both cases are allowed:
+    // 7. Verify confirmation eligibility
     //
-    // A. Payment captured but order still Pending
-    // B. Same payment already confirmed in Loomzi
+    // Allowed:
+    // A. Captured payment, pending order.
+    // B. Same captured payment, already-paid order.
     //
-    // Both must pass through the same transaction
-    // to validate the stored webhook payment.
-
+    // Both pass through the transaction
+    // to verify webhook ownership.
     if (
       !decision.readyForConfirmation &&
       !decision.alreadyPaid
@@ -132,80 +146,96 @@ const executeWebhookRecovery = async ({
         await markWebhookEventForReconciliation({
           eventId: normalizedEventId,
           processingToken: normalizedToken,
-          reason: "Payment is not ready for confirmation",
+          reason:
+            "Payment is not ready for confirmation",
         });
 
       return {
         completed: false,
         requiresReconciliation: true,
         eventStatusUpdated: Boolean(updated),
+        reason:
+          "Payment is not ready for confirmation",
       };
     }
 
-    // ==========================================
-    // 7. CONFIRM PAYMENT ATOMICALLY
-    // ==========================================
+    // 8. Validate verified payment identity
+    if (
+      !decision.userId ||
+      !decision.orderId ||
+      typeof decision.razorpayOrderId !==
+        "string" ||
+      !/^order_[A-Za-z0-9]+$/.test(
+        decision.razorpayOrderId
+      ) ||
+      typeof decision.razorpayPaymentId !==
+        "string" ||
+      !/^pay_[A-Za-z0-9]+$/.test(
+        decision.razorpayPaymentId
+      )
+    ) {
+      throw new Error(
+        "Verified recovery payment details are incomplete"
+      );
+    }
 
-    // The transaction will:
+    // 9. Confirm captured payment atomically
     //
-    // 1. Find the matching Loomzi order
-    // 2. Check the webhook processing token
-    // 3. Validate stored webhook payment details
-    // 4. Confirm the payment if still Pending
-    // 5. Complete the stock reservation
-    // 6. Complete the checkout attempt
-    // 7. Mark the webhook event Processed
+    // The confirmation transaction must:
     //
-    // If the order is already Paid using the
-    // same Razorpay payment, it will safely
-    // complete the webhook without repeating
-    // the order or stock updates.
-
+    // - Recheck the order and payment method
+    // - Validate the webhook processing token
+    // - Match the Razorpay payment amount
+    // - Settle reserved wallet funds for split
+    // - Mark the order Paid and Confirmed
+    // - Complete stock reservation
+    // - Complete checkout attempt
+    // - Mark the webhook event Processed
+    //
+    // All database changes must commit
+    // in one MongoDB transaction.
     const confirmation =
       await confirmCapturedPaymentTransaction({
         userId: decision.userId,
         orderId: decision.orderId,
-        razorpayOrderId: decision.razorpayOrderId,
-        razorpayPaymentId: decision.razorpayPaymentId,
+        razorpayOrderId:
+          decision.razorpayOrderId,
+        razorpayPaymentId:
+          decision.razorpayPaymentId,
         webhookContext: {
           eventId: normalizedEventId,
           processingToken: normalizedToken,
         },
       });
 
-    // ==========================================
-    // 8. RETURN SUCCESS
-    // ==========================================
-
-    // No separate markWebhookEventProcessed()
-    // call is required.
+    // 10. Return success
     //
-    // The MongoDB transaction already completed
-    // the webhook event.
-
+    // No separate webhook status update.
+    // The transaction already marked
+    // the webhook event Processed.
     return {
       completed: true,
-      alreadyPaid: confirmation.alreadyConfirmed,
+      alreadyPaid:
+        confirmation.alreadyConfirmed === true,
       orderId: confirmation.orderId,
-      paymentStatus: confirmation.paymentStatus,
+      paymentStatus:
+        confirmation.paymentStatus,
       requiresReconciliation: false,
     };
   } catch (error) {
-    // ==========================================
-    // 9. HANDLE RECOVERY ERRORS
-    // ==========================================
-
+    // 11. Handle recovery errors
     console.error(
       "Webhook recovery execution error:",
       error.message
     );
 
-    // Never mark the payment as Failed here.
+    // Never treat an uncertain payment
+    // as a failed payment.
     //
-    // Razorpay may already have captured it.
-    // Only the current token holder may mark
-    // this event for reconciliation.
-
+    // Never release wallet funds here.
+    //
+    // Only the current token holder can
+    // mark the event for reconciliation.
     let updated = null;
 
     try {

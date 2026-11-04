@@ -1,8 +1,9 @@
+import { confirmDialog } from "../../../components/Dialog/dialogService.js";
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import "./OfferManagement.css";
 
-const API = "http://localhost:5000";
+const API = "";
 
 const blank = () => ({
   name: "",
@@ -319,7 +320,7 @@ export default function OfferManagement() {
   // ====================================
   const remove = async (offer) => {
     if (
-      !window.confirm(
+      !await confirmDialog(
         `Delete offer "${offer.name}"?`
       )
     ) {

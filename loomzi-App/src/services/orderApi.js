@@ -1,5 +1,5 @@
 
-const API_URL = "http://localhost:5000/api/orders";
+const API_URL = "/api/orders";
 
 export const getOrderById = async (orderId) => {
   const response = await fetch(
@@ -24,7 +24,7 @@ export const getOrderById = async (orderId) => {
 
 export const getMyOrders = async () => {
   const response = await fetch(
-    "http://localhost:5000/api/orders",
+    API_URL,
     {
       method: "GET",
       credentials: "include",
@@ -43,12 +43,14 @@ export const getMyOrders = async () => {
 };
 
 
-export const cancelOrder = async (orderId) => {
+export const cancelOrder = async (orderId, refundMethod = "original") => {
   const response = await fetch(
-    `http://localhost:5000/api/orders/${encodeURIComponent(orderId)}/cancel`,
+    `${API_URL}/${encodeURIComponent(orderId)}/cancel`,
     {
       method: "PATCH",
       credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ refundMethod }),
     }
   );
 

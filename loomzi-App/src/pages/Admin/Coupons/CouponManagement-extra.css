@@ -1,0 +1,5 @@
+/* Append these styles to your existing StoreManagement.css */
+.lm-coupon-actions { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+.lm-delete-btn { background: #fff1f0; color: #c62828; border: 1px solid #f0c4c0; border-radius: 8px; padding: 10px 16px; cursor: pointer; font: inherit; }
+.lm-delete-btn:hover:not(:disabled) { background: #ffe1de; }
+.lm-delete-btn:disabled { opacity: .5; cursor: not-allowed; }

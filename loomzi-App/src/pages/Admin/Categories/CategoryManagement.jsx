@@ -1,7 +1,8 @@
+import { confirmDialog } from "../../../components/Dialog/dialogService.js";
 import { useEffect, useState } from "react";
 import "./CategoryManagement.css";
 
-const API_URL = "http://localhost:5000";
+const API_URL = "";
 
 function CategoryManagement() {
   const [categories, setCategories] = useState([]);
@@ -151,7 +152,7 @@ function CategoryManagement() {
   const changeCategoryStatus = async (category) => {
     const action = category.isListed ? "unlist" : "list";
 
-    const confirmed = window.confirm(
+    const confirmed = await confirmDialog(
       `Are you sure you want to ${action} ${category.name}?`,
     );
 

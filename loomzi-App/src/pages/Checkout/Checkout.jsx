@@ -85,6 +85,27 @@ const normalizeAddresses = (response) => {
   return [];
 };
 
+// Verify this route against your backend walletRoutes.js.
+const WALLET_BALANCE_URL = "/api/wallet";
+
+const fetchWalletBalance = async () => {
+  const response = await fetch(WALLET_BALANCE_URL, {
+    credentials: "include",
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(data.message || "Could not load wallet balance");
+  }
+  const raw = data.balancePaise ?? data.wallet?.balancePaise ??
+    data.data?.balancePaise ?? data.data?.wallet?.balancePaise;
+  if (!Number.isSafeInteger(raw) || raw < 0) {
+    throw new Error("Wallet balance response is invalid");
+  }
+  return raw;
+};
+
+const formatPaise = (paise) => formatPrice(paise / 100);
+
 const getAddressId = (address) => String(address?._id ?? address?.id ?? "");
 const loadRazorpayScript = () => new Promise((resolve, reject) => {
   if (window.Razorpay) return resolve();
@@ -117,6 +138,10 @@ function Checkout() {
   const [selectedAddressId, setSelectedAddressId] = useState("");
 
   const [paymentMethod, setPaymentMethod] = useState("COD");
+  const [useWallet, setUseWallet] = useState(false);
+  const [walletBalancePaise, setWalletBalancePaise] = useState(null);
+  const [walletLoading, setWalletLoading] = useState(true);
+  const [walletError, setWalletError] = useState("");
 
   // Logged-in customer ID (from the authenticated backend session).
   const [currentUserId, setCurrentUserId] = useState(null);
@@ -235,6 +260,28 @@ function Checkout() {
       cancelled = true;
     };
   }, []);
+
+  // ======================================
+  // Wallet balance (display only; backend recalculates at checkout)
+  // ======================================
+  const refreshWalletBalance = useCallback(async () => {
+    setWalletLoading(true);
+    setWalletError("");
+    try {
+      const balance = await fetchWalletBalance();
+      setWalletBalancePaise(balance);
+    } catch (err) {
+      setWalletBalancePaise(null);
+      setUseWallet(false);
+      setWalletError(err.message || "Wallet balance unavailable");
+    } finally {
+      setWalletLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (currentUserId) refreshWalletBalance();
+  }, [currentUserId, refreshWalletBalance]);
 
   // ======================================
   // Fetch Checkout Preview
@@ -724,7 +771,7 @@ function Checkout() {
     }
   };
 
-  // Razorpay checkout: prepare -> validate -> reserve stock -> create gateway order -> verify captured payment.
+  // Online checkout: prepare -> validate -> reserve -> Wallet or Razorpay.
   const handleOnlinePayment = async () => {
     if (razorpayBusyRef.current || payingOnline || !currentUserId) return;
     if (razorpayPendingOrderId) {
@@ -735,26 +782,53 @@ function Checkout() {
       setOrderError("Please wait for valid checkout details and select an address.");
       return;
     }
+    if (useWallet && (walletLoading || walletBalancePaise === null || walletBalancePaise <= 0)) {
+      setOrderError("Wallet balance is unavailable. Refresh it or turn off wallet payment.");
+      return;
+    }
+
     razorpayBusyRef.current = true;
     setPayingOnline(true);
     setOrderError("");
-    let createdOrderId = "";
     try {
-      await loadRazorpayScript();
       const body = { addressId: selectedAddressId };
       if (appliedCouponCode.trim()) body.couponCode = appliedCouponCode.trim().toUpperCase();
+      if (useWallet) body.useWallet = true;
+
       const key = `razorpay-${crypto.randomUUID()}`;
       const prepared = await prepareRazorpayCheckout(body, key);
       await validateRazorpayCheckout(body, key);
       const pending = await createPendingRazorpayOrder(body, key);
-      createdOrderId = String(pending.orderId || prepared.orderId || "");
-      if (!createdOrderId) throw new Error("Pending order ID missing");
-      sessionStorage.setItem("loomzi-razorpay-pending-order", createdOrderId);
-      setRazorpayPendingOrderId(createdOrderId);
-      const gateway = await createRazorpayPaymentOrder(prepared.attemptId, createdOrderId);
-      await openExistingRazorpayCheckout(gateway, createdOrderId);
+      const orderId = String(pending.orderId || "");
+      const attemptId = String(pending.attemptId || "");
+      if (!orderId || !attemptId) throw new Error("Checkout response is missing an order or attempt ID. Check order status before retrying.");
+      if (prepared.attemptId && String(prepared.attemptId) !== attemptId) {
+        throw new Error("Checkout attempt mismatch. Contact support before retrying.");
+      }
+
+      // Wallet-only orders are already settled by the backend.
+      if (pending.paymentMethod === "Wallet") {
+        if (pending.status !== "Completed") {
+          throw new Error("Wallet payment confirmation is pending. Contact support before retrying.");
+        }
+        navigate(`/order-success/${orderId}`, { replace: true });
+        return;
+      }
+      if (!["Razorpay", "Wallet+Razorpay"].includes(pending.paymentMethod)) {
+        throw new Error("Unsupported checkout payment method");
+      }
+
+      // Save before requesting the gateway order, for recovery after refresh.
+      sessionStorage.setItem("loomzi-razorpay-pending-order", orderId);
+      setRazorpayPendingOrderId(orderId);
+      const gateway = await createRazorpayPaymentOrder(attemptId, orderId);
+      const expectedPaise = pending.paymentBreakdown?.razorpayPaise;
+      if (Number.isSafeInteger(expectedPaise) && gateway.amountInPaise !== expectedPaise) {
+        throw new Error("Razorpay amount does not match the checkout allocation. Contact support.");
+      }
+      await openExistingRazorpayCheckout(gateway, orderId);
     } catch (error) {
-      setOrderError(error.message || "Online payment could not be confirmed. Check your order status.");
+      setOrderError(error.message || "Payment could not be confirmed. Check your order status before retrying.");
     } finally {
       razorpayBusyRef.current = false;
       setPayingOnline(false);
@@ -1008,49 +1082,61 @@ function Checkout() {
                 )}
               </section>
 
-              {/* PAYMENT METHOD */}
-              <section className="checkout-section">
-                <h2>Payment Method</h2>
+              {/* PAYMENT METHOD — visual refresh; existing payment handlers preserved */}
+              <section className="checkout-section checkout-payment-section">
+                <div className="checkout-payment-heading">
+                  <h2>Payment Method</h2>
+                  <span className="checkout-secure-label">✓ Secure checkout</span>
+                </div>
 
                 <div className="checkout-payment-options">
-                  <label
-                    className={`checkout-payment-option ${
-                      paymentMethod === "COD" ? "selected" : ""
-                    }`}
-                  >
-                    <input
-                      type="radio"
-                      name="paymentMethod"
-                      value="COD"
+                  <label className={`checkout-payment-option checkout-payment-card ${paymentMethod === "COD" ? "selected" : ""}`}>
+                    <input type="radio" name="paymentMethod" value="COD"
                       checked={paymentMethod === "COD"}
-                      onChange={() => setPaymentMethod("COD")}
-                    />
-
-                    <div>
-                      <strong>Cash on Delivery (COD)</strong>
-                      <p>Pay when your order is delivered.</p>
-                    </div>
+                      onChange={() => { setPaymentMethod("COD"); setUseWallet(false); }} />
+                    <span className="checkout-payment-card-icon" aria-hidden="true">◫</span>
+                    <span className="checkout-payment-card-copy">
+                      <strong>Cash on Delivery</strong>
+                      <small>Pay when your order arrives</small>
+                    </span>
+                    <span className="checkout-payment-card-check" aria-hidden="true">✓</span>
                   </label>
 
-                  <label
-                    className={`checkout-payment-option ${
-                      paymentMethod === "Razorpay" ? "selected" : ""
-                    }`}
-                  >
-                    <input
-                      type="radio"
-                      name="paymentMethod"
-                      value="Razorpay"
+                  <label className={`checkout-payment-option checkout-payment-card ${paymentMethod === "Razorpay" ? "selected" : ""}`}>
+                    <input type="radio" name="paymentMethod" value="Razorpay"
                       checked={paymentMethod === "Razorpay"}
-                      onChange={() => setPaymentMethod("Razorpay")}
-                    />
-
-                    <div>
-                      <strong>Online Payment (Razorpay)</strong>
-                      <p>Pay securely using an online payment method.</p>
-                    </div>
+                      onChange={() => setPaymentMethod("Razorpay")} />
+                    <span className="checkout-payment-card-icon" aria-hidden="true">▤</span>
+                    <span className="checkout-payment-card-copy">
+                      <strong>Online Payment</strong>
+                      <small>UPI, cards and other Razorpay options</small>
+                    </span>
+                    <span className="checkout-payment-card-check" aria-hidden="true">✓</span>
                   </label>
                 </div>
+
+                {paymentMethod === "Razorpay" && (
+                  <div className="checkout-wallet-option checkout-wallet-panel">
+                    <label className="checkout-wallet-toggle">
+                      <span className="checkout-wallet-toggle-copy">
+                        <span className="checkout-wallet-symbol" aria-hidden="true">◈</span>
+                        <span><strong>Use Loomzi Wallet</strong><small>Apply wallet balance to this order</small></span>
+                      </span>
+                      <input type="checkbox" checked={useWallet}
+                        onChange={(event) => setUseWallet(event.target.checked)}
+                        disabled={walletLoading || walletBalancePaise === null || walletBalancePaise <= 0 || Boolean(razorpayPendingOrderId) || payingOnline} />
+                    </label>
+                    <div className="checkout-wallet-balance-row">
+                      <span>Available balance</span>
+                      <strong>{walletLoading ? "Loading…" : walletBalancePaise !== null ? formatPaise(walletBalancePaise) : "Unavailable"}</strong>
+                    </div>
+                    {walletError && <p className="checkout-item-warning" role="alert">{walletError}</p>}
+                    <button className="checkout-wallet-refresh" type="button"
+                      onClick={refreshWalletBalance} disabled={walletLoading || payingOnline}>
+                      <span aria-hidden="true">↻</span> Refresh balance
+                    </button>
+                  </div>
+                )}
               </section>
             </div>
 
@@ -1212,6 +1298,27 @@ function Checkout() {
                     <strong>{formatPrice(preview.finalTotal)}</strong>
                   </div>
 
+                  {paymentMethod === "Razorpay" && useWallet && walletBalancePaise !== null && (
+                    <div className="checkout-wallet-breakdown checkout-split-panel">
+                      <div className="checkout-split-title">Estimated payment split <span>Final amounts confirmed at checkout</span></div>
+                      {(() => {
+                        const total = Math.round(Number(preview.finalTotal ?? preview.totalAmount ?? 0) * 100);
+                        if (!Number.isSafeInteger(total) || total < 100) return null;
+                        let wallet = Math.min(walletBalancePaise, total);
+                        if (wallet > 0 && wallet < total && total - wallet < 100) wallet = total - 100;
+                        return (
+                          <>
+                            <div className="checkout-total-row"><span>From Loomzi Wallet</span><strong>{formatPaise(wallet)}</strong></div>
+                            <div className="checkout-total-row"><span>Through Razorpay</span><strong>{formatPaise(total - wallet)}</strong></div>
+                            <div className="checkout-split-bar" role="img" aria-label={`Wallet covers ${Math.round(wallet / total * 100)} percent of the total`}>
+                              <span style={{ width: `${wallet / total * 100}%` }} />
+                            </div>
+                          </>
+                        );
+                      })()}
+                    </div>
+                  )}
+
                   {Number(preview.totalSavings) > 0 && (
                     <div className="checkout-savings-message">
                       You saved {formatPrice(preview.totalSavings)} on this order!
@@ -1240,9 +1347,10 @@ function Checkout() {
 
               <button
                 type="button"
+                className="checkout-primary-payment-button"
                 onClick={paymentMethod === "COD" ? handlePlaceCODOrder : handleOnlinePayment}
                 disabled={
-                  (paymentMethod === "Razorpay" && (payingOnline || Boolean(razorpayPendingOrderId))) ||
+                  (paymentMethod === "Razorpay" && (payingOnline || Boolean(razorpayPendingOrderId) || (useWallet && (walletLoading || walletBalancePaise === null)))) ||
                   !currentUserId ||
                   checkingCODRecovery ||
                   placingOrder ||
@@ -1256,7 +1364,7 @@ function Checkout() {
                 }
               >
                 {paymentMethod === "Razorpay"
-                  ? payingOnline ? "Processing Online Payment..." : "Pay Online"
+                  ? payingOnline ? "Processing Payment..." : useWallet && preview && walletBalancePaise !== null && walletBalancePaise >= Math.round(Number(preview.finalTotal ?? preview.totalAmount ?? 0) * 100) ? `Pay ${formatPrice(preview.finalTotal ?? preview.totalAmount)} with Wallet` : useWallet ? "Pay with Wallet + Razorpay" : "Pay Securely Online"
                   : checkingCODRecovery
                     ? "Checking Previous Order..."
                     : placingOrder
@@ -1271,19 +1379,49 @@ function Checkout() {
               <p className="checkout-help-text">
                 {paymentMethod === "COD"
                   ? "Pay when your order is delivered."
-                  : "Secure online payment via Razorpay."}
+                  : useWallet ? "Wallet funds are applied first; any remaining amount is paid through Razorpay." : "Secure online payment via Razorpay."}
               </p>
 
               {razorpayPendingOrderId && (
-                <div role="status" className="checkout-item-warning">
-                  <p>Online order {razorpayPendingOrderId} needs payment status verification.</p>
-                  <button type="button" onClick={checkOnlinePaymentStatus} disabled={payingOnline}>
-                    Check Online Payment Status
+                <section className="checkout-payment-pending" aria-labelledby="checkout-payment-pending-title">
+                  <div className="checkout-payment-pending-heading">
+                    <span className="checkout-payment-pending-icon" aria-hidden="true">!</span>
+                    <div>
+                      <h3 id="checkout-payment-pending-title">Payment not completed</h3>
+                      <p>Your Razorpay window was closed or payment is still being verified.</p>
+                    </div>
+                  </div>
+                  <p className="checkout-payment-pending-order">Order reference: <strong>{razorpayPendingOrderId}</strong></p>
+                  <button
+                    type="button"
+                    className="checkout-continue-payment-btn"
+                    onClick={handleContinuePayment}
+                    disabled={payingOnline || !currentUserId}
+                  >
+                    <span aria-hidden="true">↻</span>
+                    {payingOnline ? "Checking payment safely…" : "Continue Payment"}
+                    {!payingOnline && <span aria-hidden="true">→</span>}
                   </button>
-                  <button type="button" onClick={handleContinuePayment} disabled={payingOnline || !currentUserId}>
-                    {payingOnline ? "Checking..." : "Continue Payment"}
+                  <button
+                    type="button"
+                    className="checkout-check-status-btn"
+                    onClick={checkOnlinePaymentStatus}
+                    disabled={payingOnline}
+                  >
+                    Check Payment Status
                   </button>
-                </div>
+                  <button
+                    type="button"
+                    className="checkout-return-shopping-btn"
+                    onClick={() => navigate("/products")}
+                    disabled={payingOnline}
+                  >
+                    Return to Shopping →
+                  </button>
+                  <p className="checkout-payment-pending-note">
+                    Your pending order is kept for payment recovery. Returning to shopping does not cancel it or release reserved stock. If you were charged, check payment status before trying again.
+                  </p>
+                </section>
               )}
               <Link to="/cart" className="checkout-back">
                 ← Back to Cart

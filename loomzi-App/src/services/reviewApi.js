@@ -1,4 +1,4 @@
-const BASE = "http://localhost:5000/api/reviews";
+const BASE = "/api/reviews";
 async function request(path, options = {}) {
   const res = await fetch(`${BASE}${path}`, { credentials: "include", ...options, headers: { "Content-Type": "application/json", ...options.headers } });
   const data = await res.json();

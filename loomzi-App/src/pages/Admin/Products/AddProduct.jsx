@@ -4,7 +4,7 @@ import { useNavigate, useParams } from "react-router-dom";
 
 import "./AddProduct.css";
 
-const API_URL = "http://localhost:5000";
+const API_URL = "";
 
 const AGE_SIZES = [
 
@@ -54,6 +54,101 @@ const createEmptyVariant = () => ({
 
 });
 
+// Built-in image cropper: no additional npm package or CSS file required.
+function ImageCropper({ file, onSave, onCancel }) {
+  const [source, setSource] = useState("");
+  const [dimensions, setDimensions] = useState(null);
+  const [zoom, setZoom] = useState(1);
+  const [horizontal, setHorizontal] = useState(0);
+  const [vertical, setVertical] = useState(0);
+  const [working, setWorking] = useState(false);
+  const [cropError, setCropError] = useState("");
+
+  useEffect(() => {
+    const url = URL.createObjectURL(file);
+    setSource(url);
+    setDimensions(null);
+    setZoom(1);
+    setHorizontal(0);
+    setVertical(0);
+    setCropError("");
+    return () => URL.revokeObjectURL(url);
+  }, [file]);
+
+  const saveCrop = async () => {
+    if (!dimensions || working) return;
+    setWorking(true);
+    setCropError("");
+    try {
+      const image = new Image();
+      image.src = source;
+      await image.decode();
+      const canvas = document.createElement("canvas");
+      const size = 800;
+      canvas.width = size;
+      canvas.height = size;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) throw new Error("Image cropping is not supported in this browser.");
+      const scale = Math.max(size / image.naturalWidth, size / image.naturalHeight) * zoom;
+      const width = image.naturalWidth * scale;
+      const height = image.naturalHeight * scale;
+      const maxX = Math.max(0, (width - size) / 2);
+      const maxY = Math.max(0, (height - size) / 2);
+      const drawX = (size - width) / 2 + (horizontal / 100) * maxX;
+      const drawY = (size - height) / 2 + (vertical / 100) * maxY;
+      ctx.drawImage(image, drawX, drawY, width, height);
+      const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.9));
+      if (!blob) throw new Error("Unable to create the cropped image.");
+      const filename = file.name.replace(/\.[^.]+$/, "") + "-cropped.jpg";
+      const cropped = new File([blob], filename, { type: "image/jpeg" });
+      if (cropped.size > 5 * 1024 * 1024) throw new Error("Cropped image exceeds 5 MB.");
+      onSave(cropped);
+    } catch (err) {
+      setCropError(err.message || "Could not crop this image.");
+    } finally {
+      setWorking(false);
+    }
+  };
+
+  const baseScale = dimensions ? Math.max(320 / dimensions.width, 320 / dimensions.height) : 1;
+  const shownWidth = dimensions ? dimensions.width * baseScale * zoom : 320;
+  const shownHeight = dimensions ? dimensions.height * baseScale * zoom : 320;
+  const shiftX = Math.max(0, (shownWidth - 320) / 2) * horizontal / 100;
+  const shiftY = Math.max(0, (shownHeight - 320) / 2) * vertical / 100;
+  const sliderStyle = { width: "100%" };
+
+  return (
+    <div role="dialog" aria-modal="true" aria-label="Crop product image"
+      style={{ position: "fixed", inset: 0, zIndex: 10000, background: "rgba(0,0,0,.72)", display: "flex", justifyContent: "center", alignItems: "center", padding: 16 }}>
+      <div style={{ background: "white", color: "#222", borderRadius: 12, padding: 20, width: "min(100%, 420px)", maxHeight: "95vh", overflowY: "auto" }}>
+        <h3 style={{ marginTop: 0 }}>Crop product image</h3>
+        <p style={{ fontSize: 13 }}>Adjust the square crop, then click Use cropped image.</p>
+        <div style={{ width: 320, height: 320, maxWidth: "100%", margin: "0 auto", position: "relative", overflow: "hidden", background: "#eee" }}>
+          {source && <img src={source} alt="Image crop preview"
+            onLoad={(e) => setDimensions({ width: e.currentTarget.naturalWidth, height: e.currentTarget.naturalHeight })}
+            style={{ position: "absolute", width: shownWidth, height: shownHeight, maxWidth: "none", left: `calc(50% + ${shiftX}px)`, top: `calc(50% + ${shiftY}px)`, transform: "translate(-50%, -50%)" }} />}
+        </div>
+        <label style={{ display: "block", marginTop: 14 }}>Zoom: {zoom.toFixed(1)}×
+          <input type="range" min="1" max="3" step="0.1" value={zoom} onChange={(e) => setZoom(Number(e.target.value))} style={sliderStyle} />
+        </label>
+        <label style={{ display: "block" }}>Move left / right
+          <input type="range" min="-100" max="100" value={horizontal} onChange={(e) => setHorizontal(Number(e.target.value))} style={sliderStyle} />
+        </label>
+        <label style={{ display: "block" }}>Move up / down
+          <input type="range" min="-100" max="100" value={vertical} onChange={(e) => setVertical(Number(e.target.value))} style={sliderStyle} />
+        </label>
+        {cropError && <p role="alert" style={{ color: "#b91c1c" }}>{cropError}</p>}
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 16 }}>
+          <button type="button" onClick={onCancel} disabled={working}>Cancel</button>
+          <button type="button" onClick={saveCrop} disabled={!dimensions || working}>
+            {working ? "Cropping..." : "Use cropped image"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function AddProduct() {
 
   const navigate = useNavigate();
@@ -73,6 +168,7 @@ function AddProduct() {
   const [loadingProduct, setLoadingProduct] = useState(isEditMode);
 
   const [selectedImages, setSelectedImages] = useState([]);
+  const [cropQueue, setCropQueue] = useState([]);
 
   const [uploadingImages, setUploadingImages] = useState(false);
   const [previewUrls, setPreviewUrls] = useState([]);
@@ -280,12 +376,12 @@ function AddProduct() {
     return () => urls.forEach((url) => URL.revokeObjectURL(url));
   }, [selectedImages]);
 
-  // Product image selection and upload
+  // Crop each selected image before adding it to the upload list.
   const handleImageSelect = (event) => {
     const files = Array.from(event.target.files || []);
     event.target.value = "";
     if (!files.length) return;
-    if (form.images.length + selectedImages.length + files.length > 5) {
+    if (form.images.length + selectedImages.length + cropQueue.length + files.length > 5) {
       setError("You can add a maximum of 5 product images.");
       return;
     }
@@ -295,7 +391,16 @@ function AddProduct() {
       return;
     }
     setError("");
-    setSelectedImages((previous) => [...previous, ...files]);
+    setCropQueue((previous) => [...previous, ...files]);
+  };
+
+  const saveCroppedImage = (file) => {
+    setSelectedImages((previous) => [...previous, file]);
+    setCropQueue((previous) => previous.slice(1));
+  };
+
+  const cancelCrop = () => {
+    setCropQueue((previous) => previous.slice(1));
   };
 
   const removeSelectedImage = (index) => {
@@ -572,11 +677,24 @@ function AddProduct() {
 
     };
 
+    if (cropQueue.length) {
+      setError("Finish cropping your selected images before saving.");
+      return;
+    }
+
+    if (form.images.length + selectedImages.length < 3) {
+      setError("Please upload at least 3 product images before saving.");
+      return;
+    }
+
     setSaving(true);
     setUploadingImages(true);
 
     try {
       payload.images = await uploadProductImages();
+      if (payload.images.length < 3) {
+        throw new Error("Please upload at least 3 product images before saving.");
+      }
       setUploadingImages(false);
 
       const response = await fetch(
@@ -652,6 +770,9 @@ function AddProduct() {
   return (
 
     <div className="add-product-page">
+      {cropQueue.length > 0 && (
+        <ImageCropper file={cropQueue[0]} onSave={saveCroppedImage} onCancel={cancelCrop} />
+      )}
 
       <div className="add-product-heading">
 
@@ -1077,7 +1198,7 @@ function AddProduct() {
 
   <h3>Product Images</h3>
 
-  <p>Upload up to 5 images (JPG, PNG or WebP, maximum 5 MB each).</p>
+  <p>Upload at least 3 and up to 5 images (JPG, PNG or WebP, maximum 5 MB each). You can crop each image before uploading.</p>
 
   <input
 
@@ -1089,7 +1210,7 @@ function AddProduct() {
 
     onChange={handleImageSelect}
 
-    disabled={uploadingImages || saving || loadingProduct}
+    disabled={uploadingImages || saving || loadingProduct || cropQueue.length > 0}
 
   />
 

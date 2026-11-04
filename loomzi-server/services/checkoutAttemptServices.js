@@ -1,11 +1,62 @@
 
+const mongoose = require("mongoose");
+
 const CheckoutAttempt = require("../models/CheckoutAttempt");
+
+// ======================================
+// PAYMENT METHOD HELPERS
+// ======================================
+
+const PAYMENT_METHODS = [
+  "Razorpay",
+  "COD",
+  "Wallet",
+  "Wallet+Razorpay",
+];
+
+const RAZORPAY_METHODS = [
+  "Razorpay",
+  "Wallet+Razorpay",
+];
+
+const isRazorpayMethod = (method) =>
+  RAZORPAY_METHODS.includes(method);
+
+const validatePaymentMethod = (method) => {
+  if (!PAYMENT_METHODS.includes(method)) {
+    throw new Error("Invalid payment method");
+  }
+};
+
+const validateAttemptIdentity = (
+  attempt,
+  { requestHash, paymentMethod }
+) => {
+  if (!attempt) {
+    return;
+  }
+
+  if (attempt.requestHash !== requestHash) {
+    throw new Error(
+      "Idempotency key was used with different checkout details"
+    );
+  }
+
+  if (attempt.paymentMethod !== paymentMethod) {
+    throw new Error(
+      "Idempotency key was used with a different payment method"
+    );
+  }
+};
 
 // ======================================
 // 1. Find Checkout Attempt
 // ======================================
 
-const findAttempt = async (userId, idempotencyKey) => {
+const findAttempt = async (
+  userId,
+  idempotencyKey
+) => {
   return CheckoutAttempt.findOne({
     user: userId,
     idempotencyKey,
@@ -17,6 +68,10 @@ const findAttempt = async (userId, idempotencyKey) => {
 // ======================================
 
 const createAttempt = async (data) => {
+  validatePaymentMethod(
+    data.paymentMethod || "Razorpay"
+  );
+
   return CheckoutAttempt.create(data);
 };
 
@@ -29,6 +84,36 @@ const updateAttempt = async (
   expectedStatus,
   updateData
 ) => {
+  // Prevent generic updates from modifying
+  // immutable checkout identity fields.
+  const protectedFields = [
+    "user",
+    "idempotencyKey",
+    "requestHash",
+    "paymentMethod",
+  ];
+
+  if (
+    !updateData ||
+    typeof updateData !== "object" ||
+    Array.isArray(updateData)
+  ) {
+    throw new Error("Invalid checkout update data");
+  }
+
+  for (const field of protectedFields) {
+    if (
+      Object.prototype.hasOwnProperty.call(
+        updateData,
+        field
+      )
+    ) {
+      throw new Error(
+        `Cannot update checkout identity field: ${field}`
+      );
+    }
+  }
+
   return CheckoutAttempt.findOneAndUpdate(
     {
       _id: attemptId,
@@ -45,8 +130,19 @@ const updateAttempt = async (
 };
 
 // ======================================
-// 4. Link Razorpay Attempt to Order
+// 4. Link Checkout Attempt to Order
 // ======================================
+
+// Existing positional arguments are preserved.
+//
+// For Razorpay-only checkout, amountInPaise
+// is the full order amount.
+//
+// For split checkout, amountInPaise must be
+// the Razorpay contribution only.
+//
+// For wallet-only checkout, amountInPaise
+// is null because no Razorpay payment is made.
 
 const linkAttemptToOrder = async (
   attemptId,
@@ -54,27 +150,156 @@ const linkAttemptToOrder = async (
   orderId,
   cartSnapshotHash,
   amountInPaise,
-  session
+  session,
+  options = {}
 ) => {
+  if (!session) {
+    throw new Error(
+      "MongoDB transaction session required"
+    );
+  }
+
+  if (
+    !mongoose.isValidObjectId(attemptId) ||
+    !mongoose.isValidObjectId(userId) ||
+    !mongoose.isValidObjectId(orderId)
+  ) {
+    throw new Error("Invalid checkout identifiers");
+  }
+
+  if (
+    typeof cartSnapshotHash !== "string" ||
+    !/^[a-f0-9]{64}$/.test(cartSnapshotHash)
+  ) {
+    throw new Error("Invalid cart snapshot hash");
+  }
+
+  const paymentMethod =
+    options.paymentMethod || "Razorpay";
+
+  validatePaymentMethod(paymentMethod);
+
+  if (paymentMethod === "COD") {
+    throw new Error(
+      "COD checkout must use its existing order flow"
+    );
+  }
+
+  const paymentBreakdown =
+    options.paymentBreakdown || null;
+
+  if (paymentMethod !== "Razorpay" &&
+      !paymentBreakdown) {
+    throw new Error(
+      "Wallet checkout requires payment breakdown"
+    );
+  }
+
+  if (paymentBreakdown) {
+    const {
+      totalPaise,
+      walletPaise,
+      razorpayPaise,
+    } = paymentBreakdown;
+
+    if (
+      !Number.isSafeInteger(totalPaise) ||
+      !Number.isSafeInteger(walletPaise) ||
+      !Number.isSafeInteger(razorpayPaise) ||
+      totalPaise < 100 ||
+      walletPaise < 0 ||
+      razorpayPaise < 0 ||
+      walletPaise + razorpayPaise !== totalPaise
+    ) {
+      throw new Error(
+        "Invalid checkout payment breakdown"
+      );
+    }
+
+    if (
+      paymentMethod === "Razorpay" &&
+      (walletPaise !== 0 ||
+       razorpayPaise !== totalPaise)
+    ) {
+      throw new Error(
+        "Invalid Razorpay payment allocation"
+      );
+    }
+
+    if (
+      paymentMethod === "Wallet" &&
+      (walletPaise !== totalPaise ||
+       razorpayPaise !== 0)
+    ) {
+      throw new Error(
+        "Invalid wallet payment allocation"
+      );
+    }
+
+    if (
+      paymentMethod === "Wallet+Razorpay" &&
+      (walletPaise <= 0 ||
+       razorpayPaise < 100)
+    ) {
+      throw new Error(
+        "Invalid split payment allocation"
+      );
+    }
+
+    if (
+      isRazorpayMethod(paymentMethod) &&
+      amountInPaise !== razorpayPaise
+    ) {
+      throw new Error(
+        "Razorpay amount does not match allocation"
+      );
+    }
+
+    if (
+      paymentMethod === "Wallet" &&
+      amountInPaise !== null
+    ) {
+      throw new Error(
+        "Wallet-only checkout cannot have a Razorpay amount"
+      );
+    }
+  } else if (
+    !Number.isSafeInteger(amountInPaise) ||
+    amountInPaise < 100
+  ) {
+    throw new Error(
+      "Invalid Razorpay checkout amount"
+    );
+  }
+
+  const updateData = {
+    order: orderId,
+    cartSnapshotHash,
+    amountInPaise,
+    currency: "INR",
+  };
+
+  if (paymentBreakdown) {
+    updateData.paymentBreakdown = {
+      totalPaise: paymentBreakdown.totalPaise,
+      walletPaise: paymentBreakdown.walletPaise,
+      razorpayPaise: paymentBreakdown.razorpayPaise,
+    };
+  }
+
   return CheckoutAttempt.findOneAndUpdate(
     {
       _id: attemptId,
       user: userId,
-
-      // Only Razorpay attempts
-      paymentMethod: "Razorpay",
-
+      paymentMethod,
       status: "Processing",
       order: null,
       cartSnapshotHash: null,
+      razorpayOrderId: null,
+      recoveryRazorpayOrderId: null,
     },
     {
-      $set: {
-        order: orderId,
-        cartSnapshotHash,
-        amountInPaise,
-        currency: "INR",
-      },
+      $set: updateData,
     },
     {
       new: true,
@@ -86,7 +311,6 @@ const linkAttemptToOrder = async (
 
 // ======================================
 // 5. Find or Create Checkout Attempt
-// Supports Razorpay and COD
 // ======================================
 
 const findOrCreateAttempt = async ({
@@ -95,44 +319,63 @@ const findOrCreateAttempt = async ({
   requestHash,
   paymentMethod = "Razorpay",
 }) => {
-  if (!["Razorpay", "COD"].includes(paymentMethod)) {
-    throw new Error("Invalid payment method");
+  validatePaymentMethod(paymentMethod);
+
+  if (
+    typeof requestHash !== "string" ||
+    !/^[a-f0-9]{64}$/.test(requestHash)
+  ) {
+    throw new Error(
+      "Invalid checkout request hash"
+    );
   }
+
+  let attempt;
 
   try {
-    const attempt = await CheckoutAttempt.findOneAndUpdate(
-      {
-        user: userId,
-        idempotencyKey,
-      },
-      {
-        $setOnInsert: {
+    attempt =
+      await CheckoutAttempt.findOneAndUpdate(
+        {
           user: userId,
           idempotencyKey,
-          requestHash,
-          paymentMethod,
-          status: "Processing",
         },
-      },
-      {
-        upsert: true,
-        new: true,
-        runValidators: true,
-      }
-    );
-
-    return attempt;
+        {
+          $setOnInsert: {
+            user: userId,
+            idempotencyKey,
+            requestHash,
+            paymentMethod,
+            status: "Processing",
+          },
+        },
+        {
+          upsert: true,
+          new: true,
+          runValidators: true,
+        }
+      );
   } catch (error) {
-    // Handle concurrent requests using the same key
-    if (error.code === 11000) {
-      return CheckoutAttempt.findOne({
-        user: userId,
-        idempotencyKey,
-      });
+    // Concurrent request using the same key.
+    if (error.code !== 11000) {
+      throw error;
     }
 
-    throw error;
+    attempt = await CheckoutAttempt.findOne({
+      user: userId,
+      idempotencyKey,
+    });
+
+    if (!attempt) {
+      throw error;
+    }
   }
+
+  validateAttemptIdentity(attempt, {
+    requestHash,
+    paymentMethod,
+  });
+
+  return attempt;
 };
 
 // ======================================
@@ -150,11 +393,13 @@ const claimPaymentCreation = async ({
       user: userId,
       order: orderId,
 
-      // Prevent COD from entering Razorpay flow
-      paymentMethod: "Razorpay",
+      paymentMethod: {
+        $in: RAZORPAY_METHODS,
+      },
 
       status: "Processing",
       razorpayOrderId: null,
+      recoveryRazorpayOrderId: null,
     },
     {
       $set: {
@@ -177,7 +422,8 @@ const markPaymentRecoveryRequired = async ({
   attemptId,
   userId,
   razorpayOrderId = null,
-  errorMessage = "Payment creation requires reconciliation",
+  errorMessage =
+    "Payment creation requires reconciliation",
 }) => {
   const updateData = {
     status: "Recovery Required",
@@ -194,8 +440,9 @@ const markPaymentRecoveryRequired = async ({
       _id: attemptId,
       user: userId,
 
-      // Only Razorpay attempts
-      paymentMethod: "Razorpay",
+      paymentMethod: {
+        $in: RAZORPAY_METHODS,
+      },
 
       status: "Creating Payment",
     },
@@ -225,11 +472,13 @@ const attachPaymentOrderToAttempt = async ({
       user: userId,
       order: orderId,
 
-      // Only Razorpay attempts
-      paymentMethod: "Razorpay",
+      paymentMethod: {
+        $in: RAZORPAY_METHODS,
+      },
 
       status: "Creating Payment",
       razorpayOrderId: null,
+      recoveryRazorpayOrderId: null,
     },
     {
       $set: {
@@ -254,7 +503,7 @@ const findAttemptById = async (attemptId) => {
 };
 
 // ======================================
-// Exports
+// EXPORTS
 // ======================================
 
 module.exports = {

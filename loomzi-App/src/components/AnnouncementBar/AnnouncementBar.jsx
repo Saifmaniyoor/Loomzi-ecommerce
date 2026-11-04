@@ -4,7 +4,7 @@ import { Link } from "react-router-dom";
 import "./AnnouncementBar.css";
 
 const API_URL =
-  "http://localhost:5000/api/promotions/announcement";
+  "/api/promotions/announcement";
 
 const SLIDE_INTERVAL = 5000;
 

@@ -1,4 +1,6 @@
 
+require("dotenv").config();
+
 const assert = require("node:assert/strict");
 const mongoose = require("mongoose");
 
@@ -12,10 +14,56 @@ const runTest = async () => {
   let couponId = null;
 
   try {
-    await mongoose.connect(process.env.MONGO_URI);
-    console.log("MongoDB connected");
+    // =====================================
+    // 1. VERIFY TEST DATABASE CONFIGURATION
+    // =====================================
 
-    // Create a temporary test coupon
+    const mongoUri = process.env.MONGO_URI;
+
+    if (!mongoUri) {
+      throw new Error(
+        "MONGO_URI is missing from your .env file"
+      );
+    }
+
+    if (process.env.ALLOW_COUPON_TEST_WRITES !== "true") {
+      throw new Error(
+        "Set ALLOW_COUPON_TEST_WRITES=true to run database tests"
+      );
+    }
+
+    // Require a dedicated test database.
+    // Do not run against the production Loomzi database.
+    const parsedUri = new URL(mongoUri);
+    const databaseName = decodeURIComponent(
+      parsedUri.pathname.replace(/^\//, "")
+    );
+
+    if (!/(^|[_-])test($|[_-])/i.test(databaseName)) {
+      throw new Error(
+        "MONGO_URI must explicitly specify a test database, e.g. loomzi_test"
+      );
+    }
+
+    await mongoose.connect(mongoUri);
+
+    if (mongoose.connection.db.databaseName !== databaseName) {
+      throw new Error(
+        "Connected database does not match the expected test database"
+      );
+    }
+
+    console.log("MongoDB test database connected");
+
+    // =====================================
+    // 2. CREATE TEMPORARY TEST COUPON
+    // =====================================
+
+    const futureDate = () =>
+      new Date(
+        Date.now() + 365 * 24 * 60 * 60 * 1000
+      );
+
     const coupon = await Coupon.create({
       code: `TEST${new mongoose.Types.ObjectId()
         .toString()
@@ -25,13 +73,18 @@ const runTest = async () => {
       discountValue: 10,
       minimumPurchase: 500,
       maximumDiscount: 100,
-      expiresAt: new Date("2027-12-31"),
+      expiresAt: futureDate(),
       isActive: true,
+      isArchived: false,
+      archivedAt: null,
     });
 
     couponId = coupon._id;
 
-    // Run validation inside a MongoDB transaction
+    // =====================================
+    // 3. VALIDATION HELPER
+    // =====================================
+
     const validate = async ({
       couponCode = coupon.code,
       subtotal = 1000,
@@ -57,15 +110,24 @@ const runTest = async () => {
       }
     };
 
-    // Test 1: Active coupon
+    // =====================================
+    // TEST 1: ACTIVE COUPON
+    // =====================================
+
     const activeCoupon = await validate();
 
     assert.ok(activeCoupon);
+
     console.log("PASS: Active coupon accepted");
 
-    // Test 2: Inactive coupon
+    // =====================================
+    // TEST 2: INACTIVE COUPON
+    // =====================================
+
     await Coupon.findByIdAndUpdate(couponId, {
-      $set: { isActive: false },
+      $set: {
+        isActive: false,
+      },
     });
 
     await assert.rejects(
@@ -77,10 +139,15 @@ const runTest = async () => {
 
     // Reactivate coupon
     await Coupon.findByIdAndUpdate(couponId, {
-      $set: { isActive: true },
+      $set: {
+        isActive: true,
+      },
     });
 
-    // Test 3: Expired coupon
+    // =====================================
+    // TEST 3: EXPIRED COUPON
+    // =====================================
+
     await Coupon.findByIdAndUpdate(couponId, {
       $set: {
         expiresAt: new Date("2025-01-01"),
@@ -94,16 +161,21 @@ const runTest = async () => {
 
     console.log("PASS: Expired coupon rejected");
 
-    // Restore expiry date
+    // Restore future expiry date
     await Coupon.findByIdAndUpdate(couponId, {
       $set: {
-        expiresAt: new Date("2027-12-31"),
+        expiresAt: futureDate(),
       },
     });
 
-    // Test 4: Changed discount
+    // =====================================
+    // TEST 4: CHANGED DISCOUNT
+    // =====================================
+
     await Coupon.findByIdAndUpdate(couponId, {
-      $set: { maximumDiscount: 50 },
+      $set: {
+        maximumDiscount: 50,
+      },
     });
 
     await assert.rejects(
@@ -113,7 +185,10 @@ const runTest = async () => {
 
     console.log("PASS: Changed discount rejected");
 
-    // Test 5: No coupon, no discount
+    // =====================================
+    // TEST 5: NO COUPON
+    // =====================================
+
     const noCoupon = await validate({
       couponCode: null,
       expectedDiscount: 0,
@@ -123,19 +198,56 @@ const runTest = async () => {
 
     console.log("PASS: No coupon with zero discount");
 
+    // =====================================
+    // TEST 6: ARCHIVED COUPON
+    // =====================================
+
+    // Keep isActive=true deliberately.
+    // This verifies archive protection works
+    // independently of the active status.
+    await Coupon.findByIdAndUpdate(couponId, {
+      $set: {
+        isActive: true,
+        isArchived: true,
+        archivedAt: new Date(),
+        maximumDiscount: 100,
+      },
+    });
+
+    await assert.rejects(
+      validate(),
+      /Coupon is unavailable or has expired/
+    );
+
+    console.log("PASS: Archived coupon rejected");
+
     console.log(
       "\nAll checkout coupon validation tests passed!"
     );
   } finally {
-    if (couponId) {
-      await Coupon.deleteOne({ _id: couponId });
-    }
+    // =====================================
+    // CLEAN UP TEMPORARY TEST DATA
+    // =====================================
 
-    await mongoose.disconnect();
+    try {
+      if (couponId && mongoose.connection.readyState === 1) {
+        await Coupon.deleteOne({
+          _id: couponId,
+        });
+
+        console.log("Temporary test coupon removed");
+      }
+    } finally {
+      await mongoose.disconnect();
+    }
   }
 };
 
 runTest().catch((error) => {
-  console.error("Coupon validation test failed:", error);
+  console.error(
+    "Coupon validation test failed:",
+    error
+  );
+
   process.exitCode = 1;
 });

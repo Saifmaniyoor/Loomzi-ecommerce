@@ -21,6 +21,7 @@ import Checkout from "./pages/Checkout/Checkout";
 import Profile from "./pages/Profile/Profile";
 import Addresses from "./pages/Addresses/Addresses";
 import Wishlist from "./pages/Wishlist/Wishlist";
+import Wallet from "./pages/Wallet/Wallet";
 import AboutUs from "./pages/AboutUs/AboutUs";
 
 // ===============================
@@ -92,6 +93,7 @@ function App() {
             <Route path="/addresses" element={<Addresses />} />
             <Route path="/my-orders" element={<MyOrders />} />
             <Route path="/wishlist" element={<Wishlist />} />
+            <Route path="/wallet" element={<Wallet />} />
             <Route path="/order-success/:orderId" element={<OrderSuccess />} />
             <Route path="/orders/:orderId" element={<OrderDetails />} />
           </Route>

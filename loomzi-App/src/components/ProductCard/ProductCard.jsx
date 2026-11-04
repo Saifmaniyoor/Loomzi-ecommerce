@@ -1,3 +1,4 @@
+import { alertDialog } from "../Dialog/dialogService.js";
 import { useEffect, useState } from "react";
 import { FaHeart, FaPlus } from "react-icons/fa";
 import { Link, useNavigate } from "react-router-dom";
@@ -94,7 +95,7 @@ function ProductCard({ product, ratingSummary }) {
       if (error.status === 401) {
         navigate("/login");
       } else {
-        alert(error.message);
+        alertDialog(error.message);
       }
     } finally {
       setWishlistLoading(false);

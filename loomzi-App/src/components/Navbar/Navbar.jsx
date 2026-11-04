@@ -1,3 +1,4 @@
+import { alertDialog } from "../Dialog/dialogService.js";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 
@@ -36,7 +37,7 @@ function Navbar() {
 
     const fetchUser = async () => {
       try {
-        const response = await fetch("http://localhost:5000/api/auth/me", {
+        const response = await fetch("/api/auth/me", {
           credentials: "include",
         });
 
@@ -128,7 +129,7 @@ function Navbar() {
     setLoggingOut(true);
 
     try {
-      const response = await fetch("http://localhost:5000/api/auth/logout", {
+      const response = await fetch("/api/auth/logout", {
         method: "POST",
         credentials: "include",
       });
@@ -147,7 +148,7 @@ function Navbar() {
       navigate("/login", { replace: true });
     } catch (error) {
       console.error("Logout error:", error);
-      alert("Unable to logout. Please try again.");
+      alertDialog("Unable to logout. Please try again.");
     } finally {
       setLoggingOut(false);
     }
@@ -257,6 +258,14 @@ function Navbar() {
                     onClick={closeMenu}
                   >
                     My Orders
+                  </Link>
+
+                  <Link
+                    to="/wallet"
+                    className="dropdown-item"
+                    onClick={closeMenu}
+                  >
+                    My Wallet
                   </Link>
 
                   <div className="dropdown-divider" />

@@ -56,8 +56,8 @@ function ResetPassword() {
       return;
     }
 
-    if (newPassword.length < 8) {
-      setError("Password must contain at least 8 characters");
+    if (newPassword.length < 10 || !/[a-z]/.test(newPassword) || !/[A-Z]/.test(newPassword) || !/[0-9]/.test(newPassword) || !/[^A-Za-z0-9\s]/.test(newPassword) || /\s/.test(newPassword)) {
+      setError("Use 10+ characters with uppercase, lowercase, a number and a symbol (no spaces)");
       return;
     }
 
@@ -71,7 +71,7 @@ function ResetPassword() {
 
     try {
       const response = await fetch(
-        "http://localhost:5000/api/auth/reset-password",
+        "/api/auth/reset-password",
         {
           method: "POST",
           headers: {
@@ -150,7 +150,8 @@ function ResetPassword() {
                   type={showPassword ? "text" : "password"}
                   id="newPassword"
                   name="newPassword"
-                  placeholder="Password"
+                  minLength={10}
+                  placeholder="10+ characters"
                   value={formData.newPassword}
                   onChange={handleChange}
                   autoComplete="new-password"
@@ -168,6 +169,7 @@ function ResetPassword() {
                   {showPassword ? <FaEyeSlash /> : <FaEye />}
                 </button>
               </div>
+              <p className="reset-password-description">Use 10+ characters with uppercase, lowercase, a number and a symbol. No spaces.</p>
             </div>
 
             {/* Confirm Password */}

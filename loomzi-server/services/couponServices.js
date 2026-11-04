@@ -2,10 +2,17 @@
 const Coupon = require("../models/Coupon");
 const Cart = require("../models/Cart");
 
-// Find coupon by code.
+// Find non-archived coupon by code.
 // Optionally use an existing MongoDB transaction session.
 const findCouponByCode = async (code, session = null) => {
-  const query = Coupon.findOne({ code });
+  const normalizedCode = String(code || "")
+    .trim()
+    .toUpperCase();
+
+  const query = Coupon.findOne({
+    code: normalizedCode,
+    isArchived: { $ne: true },
+  });
 
   if (session) {
     query.session(session);

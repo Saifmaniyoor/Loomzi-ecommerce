@@ -1,5 +1,5 @@
 
-const API_URL = "http://localhost:5000/api/wishlist";
+const API_URL = "/api/wishlist";
 
 const handleResponse = async (response) => {
   const data = await response.json();

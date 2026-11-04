@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import "./ProductSelection.css";
 
-const API_URL = "http://localhost:5000";
+const API_URL = "";
 
 function ProductSelection() {
   const [favorites, setFavorites] = useState([]);

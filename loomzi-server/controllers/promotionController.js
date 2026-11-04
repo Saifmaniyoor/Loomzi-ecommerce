@@ -1,4 +1,3 @@
-
 const mongoose = require("mongoose");
 
 const Offer = require("../models/Offer");
@@ -36,9 +35,7 @@ const getAnnouncementPromotions = async (req, res) => {
 
       // CATEGORY OFFER
       if (offer.type === "category") {
-        const category = await Category.findById(
-          offer.target
-        )
+        const category = await Category.findById(offer.target)
           .select("name isListed")
           .lean();
 
@@ -55,9 +52,7 @@ const getAnnouncementPromotions = async (req, res) => {
           discountPercentage: offer.discountPercentage,
           maximumDiscount: offer.maximumDiscount,
           bannerImage: offer.bannerImage || "",
-          link: `/products?category=${encodeURIComponent(
-            category.name
-          )}`,
+          link: `/products?category=${encodeURIComponent(category.name)}`,
           startsAt: offer.startsAt,
           expiresAt: offer.expiresAt,
         });
@@ -65,9 +60,7 @@ const getAnnouncementPromotions = async (req, res) => {
 
       // PRODUCT OFFER
       if (offer.type === "product") {
-        const product = await Product.findById(
-          offer.target
-        )
+        const product = await Product.findById(offer.target)
           .select("name isListed category")
           .populate("category", "name isListed")
           .lean();
@@ -100,16 +93,17 @@ const getAnnouncementPromotions = async (req, res) => {
     // ===================================
     // 3. Fetch Active Coupon
     // ===================================
+    // ===================================
+    // 3. Fetch Active Coupon
+    // ===================================
     const coupon = await Coupon.findOne({
       isActive: true,
+      isArchived: { $ne: true },
       expiresAt: { $gt: now },
-
-      // Later, add showOnHomepage: true
-      // when public coupon management is implemented.
     })
       .sort({ createdAt: -1 })
       .select(
-        "code discountType discountValue minimumPurchase maximumDiscount expiresAt"
+        "code discountType discountValue minimumPurchase maximumDiscount expiresAt",
       )
       .lean();
 
@@ -132,21 +126,16 @@ const getAnnouncementPromotions = async (req, res) => {
     // 5. Send Response
     // ===================================
     return res.status(200).json({
-      message:
-        "Announcement promotions fetched successfully",
+      message: "Announcement promotions fetched successfully",
 
       offers: announcementOffers,
       coupon: announcementCoupon,
     });
   } catch (error) {
-    console.error(
-      "Announcement promotions error:",
-      error
-    );
+    console.error("Announcement promotions error:", error);
 
     return res.status(500).json({
-      message:
-        "Failed to load announcement promotions",
+      message: "Failed to load announcement promotions",
     });
   }
 };

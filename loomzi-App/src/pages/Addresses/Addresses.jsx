@@ -1,3 +1,4 @@
+import { confirmDialog } from "../../components/Dialog/dialogService.js";
 
 import { useEffect, useState } from "react";
 import {
@@ -131,7 +132,7 @@ function Addresses() {
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm("Delete this address?")) return;
+    if (!await confirmDialog("Delete this address?")) return;
 
     setBusy(true);
     setError("");

@@ -1,0 +1,8 @@
+.loomzi-dialog-backdrop{position:fixed;inset:0;z-index:999999;background:rgba(38,29,34,.48);display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(3px)}
+.loomzi-dialog{position:relative;width:min(100%,420px);background:#fff;color:#25202a;border-radius:16px;padding:32px 28px 26px;box-shadow:0 22px 70px rgba(35,22,29,.22);text-align:center}
+.loomzi-dialog-close{position:absolute;top:11px;right:12px;border:0;background:#f4f1f2;color:#827981;width:27px;height:27px;border-radius:50%;font-size:20px;line-height:1;cursor:pointer}
+.loomzi-dialog-icon{display:grid;place-items:center;width:48px;height:48px;border-radius:50%;margin:0 auto 15px;font-size:24px;font-weight:700;background:#f0e8f1;color:#7c4a65}
+.loomzi-dialog-icon-danger{background:#ffe6ed;color:#e33467}.loomzi-dialog-icon-success{background:#e5f7eb;color:#16834b}
+.loomzi-dialog h2{font-size:19px;font-weight:700;margin:0 0 9px;color:#29222b}.loomzi-dialog p{margin:0;color:#6c6570;line-height:1.55;font-size:14px;white-space:pre-line;overflow-wrap:anywhere}
+.loomzi-dialog-actions{display:flex;gap:10px;margin-top:25px;justify-content:center}.loomzi-dialog-btn{flex:1;min-height:43px;border-radius:7px;border:1px solid transparent;padding:10px 12px;font-weight:600;cursor:pointer;font-size:14px}.loomzi-dialog-secondary{background:#fff;border-color:#9a919c;color:#423b44}.loomzi-dialog-danger{background:#f33469;color:white}.loomzi-dialog-primary{background:#79506b;color:white}.loomzi-dialog-btn:focus-visible,.loomzi-dialog-close:focus-visible{outline:3px solid #a1bdf3;outline-offset:2px}
+@media(max-width:420px){.loomzi-dialog{padding:30px 18px 22px}.loomzi-dialog-actions{flex-direction:column-reverse}}

@@ -1,9 +1,10 @@
+import { confirmDialog } from "../../../components/Dialog/dialogService.js";
 import { useNavigate } from "react-router-dom";
 
 import { useEffect, useState } from "react";
 import "./CustomerManagement.css";
 
-const API_URL = "http://localhost:5000";
+const API_URL = "";
 
 function CustomerManagement() {
   const [customers, setCustomers] = useState([]);
@@ -64,7 +65,7 @@ function CustomerManagement() {
   const changeStatus = async (customer) => {
     const action = customer.isBlocked ? "unblock" : "block";
 
-    const confirmed = window.confirm(
+    const confirmed = await confirmDialog(
       `Are you sure you want to ${action} ${customer.fullName}?`,
     );
 

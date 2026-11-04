@@ -6,3 +6,5 @@
 .oa-expanded-row .oa-detail{margin:8px 12px 18px;padding:20px;min-width:0}
 .oa-expanded-row .oa-detail p{overflow-wrap:anywhere}
 @media(max-width:700px){.oa-expanded-row .oa-detail{margin:6px;padding:12px}.oa-expanded-row .oa-heading{flex-wrap:wrap}}
+
+.oa-cancel-panel{margin:22px 0;padding:18px;border:1px solid #e5c8c8;border-radius:12px;background:#fffafa}.oa-cancel-panel h3{margin-top:0;color:#8d3030}.oa-cancel-panel p{color:#6d5555;font-size:13px;line-height:1.5}.oa-cancel-panel label{display:flex;flex-direction:column;gap:7px;margin:12px 0;font-weight:600}.oa-cancel-panel textarea,.oa-cancel-panel select{width:100%;padding:10px;border:1px solid #d8caca;border-radius:8px;font:inherit}.oa-cancel-panel .oa-recovery-check{display:flex;flex-direction:row;align-items:flex-start;font-weight:500}.oa-cancel-panel .oa-recovery-check input{margin-top:4px}.oa-cancel-order-button{padding:10px 16px;border:0;border-radius:8px;background:#a83232;color:#fff;font-weight:700;cursor:pointer}.oa-cancel-order-button:disabled{opacity:.55;cursor:not-allowed}

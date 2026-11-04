@@ -11,14 +11,110 @@ const StockReservation = require(
   "../models/StockReservation"
 );
 
+// =====================================================
+// PAYMENT METHODS THAT REQUIRE RAZORPAY
+// =====================================================
+
+const RAZORPAY_METHODS = [
+  "Razorpay",
+  "Wallet+Razorpay",
+];
+
+// =====================================================
+// VALIDATE RAZORPAY PAYMENT ALLOCATION
+// =====================================================
+
+function getExpectedRazorpayAmount(order) {
+  const totalPaise = Math.round(
+    order.totalAmount * 100
+  );
+
+  if (
+    !Number.isSafeInteger(totalPaise) ||
+    totalPaise < 100
+  ) {
+    throw new Error("Invalid order payment amount");
+  }
+
+  if (order.paymentMethod === "Razorpay") {
+    // Existing orders may not have a breakdown.
+    if (!order.paymentBreakdown) {
+      return totalPaise;
+    }
+
+    const breakdown = order.paymentBreakdown;
+
+    if (
+      breakdown.totalPaise !== totalPaise ||
+      breakdown.walletPaise !== 0 ||
+      breakdown.razorpayPaise !== totalPaise
+    ) {
+      throw new Error(
+        "Razorpay payment breakdown mismatch"
+      );
+    }
+
+    return totalPaise;
+  }
+
+  if (order.paymentMethod === "Wallet+Razorpay") {
+    const breakdown = order.paymentBreakdown;
+
+    if (!breakdown) {
+      throw new Error(
+        "Split payment breakdown is missing"
+      );
+    }
+
+    const {
+      totalPaise: breakdownTotal,
+      walletPaise,
+      razorpayPaise,
+      walletStatus,
+    } = breakdown;
+
+    if (
+      !Number.isSafeInteger(breakdownTotal) ||
+      !Number.isSafeInteger(walletPaise) ||
+      !Number.isSafeInteger(razorpayPaise) ||
+      breakdownTotal !== totalPaise ||
+      walletPaise <= 0 ||
+      razorpayPaise < 100 ||
+      walletPaise + razorpayPaise !== totalPaise
+    ) {
+      throw new Error(
+        "Invalid split payment allocation"
+      );
+    }
+
+    if (walletStatus !== "Reserved") {
+      throw new Error(
+        "Wallet funds are not reserved for this checkout"
+      );
+    }
+
+    return razorpayPaise;
+  }
+
+  throw new Error(
+    "This payment method does not require Razorpay"
+  );
+}
+
+// =====================================================
+// CLAIM PAYMENT CREATION TRANSACTION
+// =====================================================
+
 // Internal transaction.
 //
-// Only one checkout request should be able
-// to change its status from Processing
-// to Creating Payment.
+// Only one checkout request can change its
+// status from Processing to Creating Payment.
 //
 // IMPORTANT:
-// This function does not call Razorpay.
+// This function does NOT call Razorpay.
+// It only claims permission to create
+// a Razorpay payment order.
+
 const claimPaymentCreationTransaction = async ({
   attemptId,
   userId,
@@ -43,6 +139,9 @@ const claimPaymentCreationTransaction = async ({
       const order = await Order.findOne({
         _id: orderId,
         user: userId,
+        paymentMethod: {
+          $in: RAZORPAY_METHODS,
+        },
         paymentStatus: "Pending",
         orderStatus: "Pending",
         razorpayOrderId: null,
@@ -51,23 +150,15 @@ const claimPaymentCreationTransaction = async ({
 
       if (!order) {
         throw new Error(
-          "Order is not available for payment"
+          "Order is not available for Razorpay payment"
         );
       }
 
-      // 3. Calculate expected payment amount
-      const expectedAmountInPaise = Math.round(
-        order.totalAmount * 100
-      );
-
-      if (
-        !Number.isSafeInteger(expectedAmountInPaise) ||
-        expectedAmountInPaise < 100
-      ) {
-        throw new Error(
-          "Invalid order payment amount"
-        );
-      }
+      // 3. Determine the correct Razorpay amount.
+      // Razorpay-only: full order total.
+      // Split payment: Razorpay contribution only.
+      const expectedAmountInPaise =
+        getExpectedRazorpayAmount(order);
 
       // 4. Verify stock reservation
       const reservation =
@@ -86,13 +177,16 @@ const claimPaymentCreationTransaction = async ({
         );
       }
 
-      // 5. Atomically claim payment creation
+      // 5. Atomically claim payment creation.
+      // Match the payment method and amount
+      // against the pending order.
       const attempt =
         await CheckoutAttempt.findOneAndUpdate(
           {
             _id: attemptId,
             user: userId,
             order: orderId,
+            paymentMethod: order.paymentMethod,
             status: "Processing",
             razorpayOrderId: null,
             recoveryRazorpayOrderId: null,
@@ -118,10 +212,38 @@ const claimPaymentCreationTransaction = async ({
         );
       }
 
-      // 6. Return the claimed payment details
+      // 6. Validate the attempt breakdown
+      // after claiming it.
+      //
+      // Any error here rolls back the
+      // entire MongoDB transaction.
+      if (order.paymentMethod === "Wallet+Razorpay") {
+        const attemptBreakdown =
+          attempt.paymentBreakdown;
+
+        const orderBreakdown =
+          order.paymentBreakdown;
+
+        if (
+          !attemptBreakdown ||
+          attemptBreakdown.totalPaise !==
+            orderBreakdown.totalPaise ||
+          attemptBreakdown.walletPaise !==
+            orderBreakdown.walletPaise ||
+          attemptBreakdown.razorpayPaise !==
+            orderBreakdown.razorpayPaise
+        ) {
+          throw new Error(
+            "Checkout attempt payment breakdown mismatch"
+          );
+        }
+      }
+
+      // 7. Return the claimed payment details
       result = {
         attemptId: attempt._id,
         orderId: order._id,
+        paymentMethod: order.paymentMethod,
         amountInPaise: attempt.amountInPaise,
         currency: attempt.currency,
         status: attempt.status,

@@ -4,6 +4,8 @@
 require("dotenv").config();
 
 const express = require("express");
+const path = require("node:path");
+const fs = require("node:fs");
 const cors = require("cors");
 const session = require("express-session");
 const { MongoStore } = require("connect-mongo");
@@ -60,10 +62,10 @@ const app = express();
 // ======================================
 // 1. CORS Middleware
 // ======================================
-app.use(cors({
-  origin: "http://localhost:5173",
-  credentials: true,
-}));
+if (process.env.NODE_ENV !== "production") {
+  app.use(cors({ origin: "http://localhost:5174", credentials: true }));
+}
+app.set("trust proxy", 1);
 
 // ======================================
 // 2. Razorpay Webhook (BEFORE express.json)
@@ -90,6 +92,9 @@ startWebhookPolling();
 // ======================================
 // 5. Session Configuration
 // ======================================
+
+app.set("trust proxy", 1);
+
 app.use(session({
   name: "loomzi.sid",
   secret: process.env.SESSION_SECRET,
@@ -98,7 +103,7 @@ app.use(session({
   store: MongoStore.create({ mongoUrl: process.env.MONGO_URI }),
   cookie: {
     httpOnly: true,
-    secure: false,
+    secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
     maxAge: 24 * 60 * 60 * 1000,
   },
@@ -131,6 +136,8 @@ app.use("/api/profile", profileRoutes);
 app.use("/api/addresses", addressRoutes);
 app.use("/api/wishlist", wishlistRoutes);
 app.use("/api/orders", orderRoutes);
+app.use("/api/wallet", require("./routes/walletRoutes"));
+app.use("/api/admin/wallets", require("./routes/adminWalletRoutes"));
 app.use("/api/reviews", reviewRoutes);
 
 // ======================================
@@ -145,12 +152,31 @@ app.use("/api/checkout", checkoutRoutes);
 app.use("/api/payments", razorpayResumeRoutes);
 app.use("/api/payments", paymentConfirmationRoutes);
 
+// Return useful messages for invalid JSON and oversized requests.
+app.use((err, req, res, next) => {
+  if (err instanceof SyntaxError && err.status === 400 && "body" in err) {
+    return res.status(400).json({ message: "Invalid JSON request. Please check your input and try again." });
+  }
+  if (err.status === 413) {
+    return res.status(413).json({ message: "Request is too large. Please upload smaller images." });
+  }
+  next(err);
+});
+
 // ======================================
 // 10. Test Route
 // ======================================
-app.get("/", (req, res) => {
-  res.send("Loomzi Backend API is running");
-});
+const frontendDir = path.join(__dirname, "public");
+if (fs.existsSync(path.join(frontendDir, "index.html"))) {
+  app.use(express.static(frontendDir));
+  app.use((req, res, next) => {
+    if (req.method !== "GET" || req.path.startsWith("/api/")) return next();
+    if (!req.accepts("html")) return next();
+    res.sendFile(path.join(frontendDir, "index.html"));
+  });
+} else {
+  app.get("/", (req, res) => res.send("Loomzi backend is running; frontend build missing"));
+}
 
 // ======================================
 // 11. Start Server

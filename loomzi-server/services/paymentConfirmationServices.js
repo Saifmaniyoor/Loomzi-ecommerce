@@ -83,16 +83,42 @@ const confirmRazorpayPayment = async ({
     );
   }
 
-  // 7. Calculate trusted amount from MongoDB
-  const expectedAmountInPaise = Math.round(
-    order.totalAmount * 100
-  );
+  // 7. Calculate the amount Razorpay actually collected.
+  // For split payments the wallet contribution was reserved separately.
+  const totalPaise = Math.round(order.totalAmount * 100);
+  const breakdown = order.paymentBreakdown;
+  let expectedAmountInPaise;
 
-  if (
-    !Number.isSafeInteger(expectedAmountInPaise) ||
-    expectedAmountInPaise < 100
-  ) {
+  if (!Number.isSafeInteger(totalPaise) || totalPaise < 100) {
     throw new Error("Invalid order payment amount");
+  }
+
+  if (order.paymentMethod === "Wallet+Razorpay") {
+    if (
+      !breakdown ||
+      breakdown.totalPaise !== totalPaise ||
+      !Number.isSafeInteger(breakdown.walletPaise) ||
+      !Number.isSafeInteger(breakdown.razorpayPaise) ||
+      breakdown.walletPaise <= 0 ||
+      breakdown.razorpayPaise < 100 ||
+      breakdown.walletPaise + breakdown.razorpayPaise !== totalPaise ||
+      !["Reserved", "Settled"].includes(breakdown.walletStatus)
+    ) {
+      throw new Error("Invalid split payment breakdown");
+    }
+    expectedAmountInPaise = breakdown.razorpayPaise;
+  } else if (order.paymentMethod === "Razorpay") {
+    if (
+      breakdown &&
+      (breakdown.totalPaise !== totalPaise ||
+        breakdown.walletPaise !== 0 ||
+        breakdown.razorpayPaise !== totalPaise)
+    ) {
+      throw new Error("Invalid Razorpay payment breakdown");
+    }
+    expectedAmountInPaise = totalPaise;
+  } else {
+    throw new Error("Order does not require Razorpay confirmation");
   }
 
   // 8. Verify signature and captured payment

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import "./AdminLogin.css";
 import "../Settings/AdminAccountSettings.css";
-const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
+const API = import.meta.env.VITE_API_URL || "";
 export default function AdminForgotPassword() {
   const navigate = useNavigate();
   const [stage, setStage] = useState(0);

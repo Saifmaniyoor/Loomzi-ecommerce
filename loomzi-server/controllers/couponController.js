@@ -41,6 +41,13 @@ const validateCoupon = async (req, res) => {
       });
     }
 
+    // NEW: Reject archived coupons
+    if (coupon.isArchived === true) {
+      return res.status(400).json({
+        message: "This coupon is no longer available",
+      });
+    }
+
     // Check whether coupon is active
     if (!coupon.isActive) {
       return res.status(400).json({

@@ -45,7 +45,7 @@ function VerifyOtp() {
     setResending(true);
     setError("");
     try {
-      const response = await fetch("http://localhost:5000/api/auth/resend-otp", {
+      const response = await fetch("/api/auth/resend-otp", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: email.trim().toLowerCase() }),
       });
@@ -162,7 +162,7 @@ function VerifyOtp() {
     try {
       // Send OTP to Express backend
       const response = await fetch(
-        "http://localhost:5000/api/auth/verify-otp",
+        "/api/auth/verify-otp",
         {
           method: "POST",
           headers: {

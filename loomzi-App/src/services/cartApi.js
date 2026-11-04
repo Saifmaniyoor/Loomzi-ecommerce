@@ -1,5 +1,5 @@
 
-const API_URL = "http://localhost:5000/api/cart";
+const API_URL = "/api/cart";
 
 // GET - Fetch customer's cart
 export const getCart = async () => {

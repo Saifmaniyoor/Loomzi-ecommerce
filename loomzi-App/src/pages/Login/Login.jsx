@@ -79,7 +79,7 @@ function Login() {
     try {
       // Send login details to backend
       const response = await fetch(
-        "http://localhost:5000/api/auth/login",
+        "/api/auth/login",
         {
           method: "POST",
 

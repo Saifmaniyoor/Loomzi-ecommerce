@@ -7,18 +7,35 @@ const {
   matchWebhookOrder,
 } = require("./webhookOrderMatchingServices");
 
+// ==========================================
+// VERIFY WEBHOOK CAPTURED PAYMENT
+// ==========================================
+
 // Read-only verification and order matching.
-// Does NOT update MongoDB.
+//
+// Supports:
+// - Razorpay-only
+// - Wallet + Razorpay
+//
+// Does NOT modify MongoDB.
+//
+// IMPORTANT:
+// The caller must first authenticate the
+// webhook signature.
+//
+// The reported webhook amount is compared
+// against Razorpay's API response here.
+//
+// matchWebhookOrder() must separately
+// compare it with the trusted Loomzi
+// order's Razorpay contribution.
 
 const verifyWebhookCapturedPayment = async ({
   razorpayOrderId,
   razorpayPaymentId,
   amountInPaise,
 }) => {
-  // ==========================================
-  // 1. VALIDATE PAYMENT DETAILS
-  // ==========================================
-
+  // 1. Validate payment details
   if (
     typeof razorpayOrderId !== "string" ||
     !/^order_[A-Za-z0-9]+$/.test(razorpayOrderId) ||
@@ -32,18 +49,21 @@ const verifyWebhookCapturedPayment = async ({
     );
   }
 
-  // ==========================================
-  // 2. VERIFY PAYMENT WITH RAZORPAY
-  // ==========================================
-
+  // 2. Fetch payment directly from Razorpay.
+  //
+  // Provider/network errors must propagate.
+  // An unavailable response is not proof
+  // that payment failed.
   const payment = await fetchRazorpayPayment(
     razorpayPaymentId
   );
 
+  // 3. Verify payment identity and capture
   if (
     !payment ||
     payment.id !== razorpayPaymentId ||
     payment.order_id !== razorpayOrderId ||
+    !Number.isSafeInteger(payment.amount) ||
     payment.amount !== amountInPaise ||
     payment.currency !== "INR" ||
     payment.status !== "captured" ||
@@ -56,30 +76,50 @@ const verifyWebhookCapturedPayment = async ({
     };
   }
 
-  // ==========================================
-  // 3. MATCH LOOMZI ORDER
-  // ==========================================
-
+  // 4. Match payment to the Loomzi order.
+  //
+  // This service must check:
+  //
+  // Razorpay-only:
+  //   expected = full order total
+  //
+  // Wallet + Razorpay:
+  //   expected = paymentBreakdown.razorpayPaise
+  //
+  // Wallet-only and COD must be rejected.
   const matching = await matchWebhookOrder({
     razorpayOrderId,
-    amountInPaise,
+    amountInPaise: payment.amount,
   });
 
-  if (!matching.matched) {
+  if (!matching || matching.matched !== true) {
     return {
       verified: false,
       requiresReconciliation: true,
       reason:
-        matching.message ||
+        matching?.message ||
         "Matching Loomzi order not found",
     };
   }
 
-  // ==========================================
-  // 4. CHECK ALREADY-PAID ORDERS
-  // ==========================================
+  // 5. Validate matched order identifiers
+  if (
+    !matching.userId ||
+    !matching.orderId
+  ) {
+    return {
+      verified: false,
+      requiresReconciliation: true,
+      reason: "Matching Loomzi order identity is missing",
+    };
+  }
 
-  if (matching.alreadyPaid) {
+  // 6. Check already-paid orders.
+  //
+  // A duplicate webhook is acceptable only
+  // when the existing order was paid using
+  // this exact Razorpay payment ID.
+  if (matching.alreadyPaid === true) {
     if (
       matching.razorpayPaymentId !==
       razorpayPaymentId
@@ -93,19 +133,18 @@ const verifyWebhookCapturedPayment = async ({
     }
   }
 
-  // ==========================================
-  // 5. RETURN VERIFIED PAYMENT DETAILS
-  // ==========================================
-
+  // 7. Return verified payment details
   return {
     verified: true,
     requiresReconciliation: false,
-    alreadyPaid: matching.alreadyPaid,
+    alreadyPaid: matching.alreadyPaid === true,
     userId: matching.userId,
     orderId: matching.orderId,
     razorpayOrderId,
     razorpayPaymentId,
-    amountInPaise,
+    amountInPaise: payment.amount,
+    currency: payment.currency,
+    paymentStatus: payment.status,
   };
 };
 

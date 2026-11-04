@@ -4,48 +4,84 @@ const crypto = require("node:crypto");
 const WebhookEvent = require("../models/WebhookEvent");
 
 // ==========================================
+// HELPERS
+// ==========================================
+
+const normalizeEventId = (eventId) => {
+  if (
+    typeof eventId !== "string" ||
+    !eventId.trim() ||
+    eventId.trim().length > 255
+  ) {
+    throw new Error("Valid webhook event ID required");
+  }
+
+  return eventId.trim();
+};
+
+const normalizeProcessingToken = (token) => {
+  if (
+    typeof token !== "string" ||
+    !token.trim()
+  ) {
+    throw new Error(
+      "Valid webhook processing token required"
+    );
+  }
+
+  return token.trim();
+};
+
+const hashPayload = (payload) => {
+  return crypto
+    .createHash("sha256")
+    .update(JSON.stringify(payload))
+    .digest("hex");
+};
+
+// ==========================================
 // 1. REGISTER WEBHOOK EVENT
 // ==========================================
 
-// Register a verified Razorpay webhook event.
-//
 // IMPORTANT:
-// The controller must verify the Razorpay
-// signature BEFORE calling this function.
+// The controller must authenticate the
+// Razorpay webhook signature BEFORE
+// registering the event.
+//
+// This service does not verify signatures.
 
 const registerWebhookEvent = async ({
   eventId,
   eventType,
   payload,
 }) => {
-  // Validate event details
+  const normalizedEventId =
+    normalizeEventId(eventId);
+
   if (
-    typeof eventId !== "string" ||
-    !eventId.trim() ||
-    eventId.length > 255 ||
     typeof eventType !== "string" ||
     !eventType.trim() ||
     !payload ||
     typeof payload !== "object" ||
-    Array.isArray(payload) ||
-    payload.event !== eventType
+    Array.isArray(payload)
   ) {
     throw new Error(
-      "Invalid webhook event registration details"
+      "Invalid webhook registration details"
     );
   }
 
-  const normalizedEventId = eventId.trim();
-  const normalizedEventType = eventType.trim();
+  const normalizedEventType =
+    eventType.trim();
 
-  // Generate a fingerprint of the payload
-  const payloadHash = crypto
-    .createHash("sha256")
-    .update(JSON.stringify(payload))
-    .digest("hex");
+  if (payload.event !== normalizedEventType) {
+    throw new Error(
+      "Webhook event type does not match payload"
+    );
+  }
+
+  const payloadHash = hashPayload(payload);
 
   try {
-    // Save a new webhook event
     const event = await WebhookEvent.create({
       eventId: normalizedEventId,
       eventType: normalizedEventType,
@@ -58,40 +94,37 @@ const registerWebhookEvent = async ({
       isDuplicate: false,
     };
   } catch (error) {
-    // Handle duplicate event IDs
     if (error.code !== 11000) {
       throw error;
     }
 
-    const existingEvent = await WebhookEvent.findOne({
-      eventId: normalizedEventId,
-    });
+    const existingEvent =
+      await WebhookEvent.findOne({
+        eventId: normalizedEventId,
+      });
 
     if (!existingEvent) {
       throw error;
     }
 
-    // Compare existing event payload
     const existingPayloadHash =
       existingEvent.payload == null
         ? null
-        : crypto
-            .createHash("sha256")
-            .update(JSON.stringify(existingEvent.payload))
-            .digest("hex");
+        : hashPayload(existingEvent.payload);
 
-    // Prevent mismatched duplicate events
     if (
-      existingEvent.eventType !== normalizedEventType ||
-      (existingPayloadHash !== null &&
-        existingPayloadHash !== payloadHash)
+      existingEvent.eventType !==
+        normalizedEventType ||
+      (
+        existingPayloadHash !== null &&
+        existingPayloadHash !== payloadHash
+      )
     ) {
       throw new Error(
         "Webhook event ID conflicts with existing event data"
       );
     }
 
-    // Older events may not contain payload data
     if (existingPayloadHash === null) {
       return {
         event: existingEvent,
@@ -108,33 +141,27 @@ const registerWebhookEvent = async ({
 };
 
 // ==========================================
-// 2. CLAIM WEBHOOK EVENT
+// 2. CLAIM NEW WEBHOOK EVENT
 // ==========================================
 
-// Atomically claim a newly received event.
-// A unique processing token is generated
-// for the worker claiming the event.
+// Only events in Received status
+// can be claimed by a new worker.
 
 const claimWebhookEvent = async (eventId) => {
-  // Validate event ID
-  if (
-    typeof eventId !== "string" ||
-    !eventId.trim()
-  ) {
-    throw new Error(
-      "Valid webhook event ID required"
-    );
-  }
+  const normalizedEventId =
+    normalizeEventId(eventId);
 
-  // Generate a unique processing token
-  const processingToken = crypto.randomUUID();
+  const processingToken =
+    crypto.randomUUID();
 
-  // Atomically claim the event
-  const event = await WebhookEvent.findOneAndUpdate(
+  return WebhookEvent.findOneAndUpdate(
     {
-      eventId: eventId.trim(),
+      eventId: normalizedEventId,
       status: "Received",
-      payload: { $ne: null },
+      payload: {
+        $exists: true,
+        $ne: null,
+      },
     },
     {
       $set: {
@@ -148,13 +175,10 @@ const claimWebhookEvent = async (eventId) => {
       },
     },
     {
-      returnDocument: "after",
+      new: true,
       runValidators: true,
     }
   );
-
-  // Returns null if the event was already claimed
-  return event;
 };
 
 // ==========================================
@@ -162,47 +186,42 @@ const claimWebhookEvent = async (eventId) => {
 // ==========================================
 
 const findWebhookEventById = async (eventId) => {
-  if (
-    typeof eventId !== "string" ||
-    !eventId.trim()
-  ) {
-    throw new Error(
-      "Valid webhook event ID required"
-    );
-  }
+  const normalizedEventId =
+    normalizeEventId(eventId);
 
   return WebhookEvent.findOne({
-    eventId: eventId.trim(),
+    eventId: normalizedEventId,
   });
 };
 
 // ==========================================
-// 4. MARK WEBHOOK EVENT AS PROCESSED
+// 4. MARK WEBHOOK EVENT PROCESSED
 // ==========================================
 
-// Only the worker holding the matching
-// processing token can mark the event processed.
+// Only the current processing-token owner
+// can mark an event as Processed.
+//
+// The payment confirmation transaction
+// should normally perform this update
+// within its MongoDB session.
 
 const markWebhookEventProcessed = async ({
   eventId,
   processingToken,
 }) => {
-  if (
-    typeof eventId !== "string" ||
-    !eventId.trim() ||
-    typeof processingToken !== "string" ||
-    !processingToken.trim()
-  ) {
-    throw new Error(
-      "Valid event ID and processing token required"
+  const normalizedEventId =
+    normalizeEventId(eventId);
+
+  const normalizedToken =
+    normalizeProcessingToken(
+      processingToken
     );
-  }
 
   return WebhookEvent.findOneAndUpdate(
     {
-      eventId: eventId.trim(),
+      eventId: normalizedEventId,
       status: "Processing",
-      processingToken: processingToken.trim(),
+      processingToken: normalizedToken,
     },
     {
       $set: {
@@ -214,7 +233,7 @@ const markWebhookEventProcessed = async ({
       },
     },
     {
-      returnDocument: "after",
+      new: true,
       runValidators: true,
     }
   );
@@ -224,32 +243,39 @@ const markWebhookEventProcessed = async ({
 // 5. MARK EVENT FOR RECONCILIATION
 // ==========================================
 
-// Mark an event as requiring investigation.
-// This does NOT update any order payment status.
+// This does NOT:
+// - Mark an order as Failed
+// - Release wallet funds
+// - Cancel stock reservations
+// - Refund a payment
 
 const markWebhookEventForReconciliation = async ({
   eventId,
   processingToken,
   reason,
 }) => {
+  const normalizedEventId =
+    normalizeEventId(eventId);
+
+  const normalizedToken =
+    normalizeProcessingToken(
+      processingToken
+    );
+
   if (
-    typeof eventId !== "string" ||
-    !eventId.trim() ||
-    typeof processingToken !== "string" ||
-    !processingToken.trim() ||
     typeof reason !== "string" ||
     !reason.trim()
   ) {
     throw new Error(
-      "Valid event ID, processing token and reason required"
+      "Valid reconciliation reason required"
     );
   }
 
   return WebhookEvent.findOneAndUpdate(
     {
-      eventId: eventId.trim(),
+      eventId: normalizedEventId,
       status: "Processing",
-      processingToken: processingToken.trim(),
+      processingToken: normalizedToken,
     },
     {
       $set: {
@@ -260,36 +286,36 @@ const markWebhookEventForReconciliation = async ({
       },
     },
     {
-      returnDocument: "after",
+      new: true,
       runValidators: true,
     }
   );
 };
 
+// ==========================================
+// 6. CLAIM EVENT FOR RECOVERY
+// ==========================================
+
+// Only events requiring reconciliation
+// can be claimed through this method.
 
 const claimWebhookEventForRecovery = async (
   eventId
 ) => {
-  // 1. Validate event ID
-  if (
-    typeof eventId !== "string" ||
-    !eventId.trim()
-  ) {
-    throw new Error(
-      "Valid webhook event ID required"
-    );
-  }
+  const normalizedEventId =
+    normalizeEventId(eventId);
 
-  // 2. Generate a new ownership token
-  const processingToken = crypto.randomUUID();
+  const processingToken =
+    crypto.randomUUID();
 
-  // 3. Atomically claim an event that
-  // requires reconciliation.
-  const event = await WebhookEvent.findOneAndUpdate(
+  return WebhookEvent.findOneAndUpdate(
     {
-      eventId: eventId.trim(),
+      eventId: normalizedEventId,
       status: "Requires Reconciliation",
-      payload: { $ne: null },
+      payload: {
+        $exists: true,
+        $ne: null,
+      },
     },
     {
       $set: {
@@ -303,30 +329,42 @@ const claimWebhookEventForRecovery = async (
       },
     },
     {
-      returnDocument: "after",
+      new: true,
       runValidators: true,
     }
   );
-
-  return event;
 };
 
+// ==========================================
+// 7. RECLAIM INTERRUPTED EVENT
+// ==========================================
+
+// An interrupted event may be reclaimed
+// after 5 minutes.
+//
+// IMPORTANT:
+// The MongoDB query independently checks
+// the expiry cutoff.
+//
+// This prevents an event from being
+// reclaimed using stale ownership data.
 
 const reclaimInterruptedWebhookEvent = async ({
   eventId,
   expectedProcessingToken,
   expectedProcessingStartedAt,
 }) => {
-  // 1. Validate inputs
-  if (
-    typeof eventId !== "string" ||
-    !eventId.trim() ||
-    typeof expectedProcessingToken !== "string" ||
-    !expectedProcessingToken.trim() ||
-    !expectedProcessingStartedAt
-  ) {
+  const normalizedEventId =
+    normalizeEventId(eventId);
+
+  const previousToken =
+    normalizeProcessingToken(
+      expectedProcessingToken
+    );
+
+  if (!expectedProcessingStartedAt) {
     throw new Error(
-      "Valid event ID and previous processing details required"
+      "Previous processing start time required"
     );
   }
 
@@ -334,34 +372,44 @@ const reclaimInterruptedWebhookEvent = async ({
     expectedProcessingStartedAt
   );
 
-  if (Number.isNaN(previousStart.getTime())) {
+  if (
+    Number.isNaN(previousStart.getTime())
+  ) {
     throw new Error(
       "Invalid previous processing start time"
     );
   }
 
-  // 2. Only consider events older than 5 minutes
   const cutoffTime = new Date(
     Date.now() - 5 * 60 * 1000
   );
 
+  // Do not reclaim a recently claimed event.
   if (previousStart > cutoffTime) {
     return null;
   }
 
-  // 3. Generate a new processing token
-  const newProcessingToken = crypto.randomUUID();
+  const newProcessingToken =
+    crypto.randomUUID();
 
-  // 4. Atomically replace ownership only if
-  // the stored values still match.
-  const event = await WebhookEvent.findOneAndUpdate(
+  return WebhookEvent.findOneAndUpdate(
     {
-      eventId: eventId.trim(),
+      eventId: normalizedEventId,
       status: "Processing",
-      processingToken:
-        expectedProcessingToken.trim(),
-      processingStartedAt: previousStart,
-      payload: { $ne: null },
+      processingToken: previousToken,
+
+      // Both conditions must match:
+      // 1. Same original processing time
+      // 2. Claim is at least 5 minutes old
+      processingStartedAt: {
+        $eq: previousStart,
+        $lte: cutoffTime,
+      },
+
+      payload: {
+        $exists: true,
+        $ne: null,
+      },
     },
     {
       $set: {
@@ -373,15 +421,11 @@ const reclaimInterruptedWebhookEvent = async ({
       },
     },
     {
-      returnDocument: "after",
+      new: true,
       runValidators: true,
     }
   );
-
-  return event;
 };
-
-
 
 // ==========================================
 // EXPORT SERVICES

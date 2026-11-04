@@ -11,12 +11,159 @@ const StockReservation = require(
   "../models/StockReservation"
 );
 
-// Atomically link an existing Razorpay order
-// to the Loomzi order and checkout attempt.
-//
-// IMPORTANT:
+// =====================================================
+// SUPPORTED RAZORPAY PAYMENT METHODS
+// =====================================================
+
+const RAZORPAY_METHODS = [
+  "Razorpay",
+  "Wallet+Razorpay",
+];
+
+// =====================================================
+// VALIDATE ORDER PAYMENT ALLOCATION
+// =====================================================
+
+function getExpectedRazorpayAmount(order) {
+  const totalPaise = Math.round(
+    order.totalAmount * 100
+  );
+
+  if (
+    !Number.isSafeInteger(totalPaise) ||
+    totalPaise < 100
+  ) {
+    throw new Error("Invalid Loomzi order total");
+  }
+
+  // Legacy Razorpay orders may not have
+  // a payment breakdown.
+  if (order.paymentMethod === "Razorpay") {
+    if (!order.paymentBreakdown) {
+      return totalPaise;
+    }
+
+    const breakdown = order.paymentBreakdown;
+
+    if (
+      breakdown.totalPaise !== totalPaise ||
+      breakdown.walletPaise !== 0 ||
+      breakdown.razorpayPaise !== totalPaise ||
+      breakdown.walletStatus !== "Not Used"
+    ) {
+      throw new Error(
+        "Razorpay payment breakdown mismatch"
+      );
+    }
+
+    return totalPaise;
+  }
+
+  // Split payment must have a valid
+  // reserved wallet contribution.
+  if (order.paymentMethod === "Wallet+Razorpay") {
+    const breakdown = order.paymentBreakdown;
+
+    if (!breakdown) {
+      throw new Error(
+        "Split payment breakdown is missing"
+      );
+    }
+
+    const {
+      totalPaise: breakdownTotal,
+      walletPaise,
+      razorpayPaise,
+      walletStatus,
+    } = breakdown;
+
+    if (
+      !Number.isSafeInteger(breakdownTotal) ||
+      !Number.isSafeInteger(walletPaise) ||
+      !Number.isSafeInteger(razorpayPaise) ||
+      breakdownTotal !== totalPaise ||
+      walletPaise <= 0 ||
+      razorpayPaise < 100 ||
+      walletPaise + razorpayPaise !== totalPaise ||
+      walletStatus !== "Reserved"
+    ) {
+      throw new Error(
+        "Invalid or unreserved split payment allocation"
+      );
+    }
+
+    return razorpayPaise;
+  }
+
+  throw new Error(
+    "Order payment method does not require Razorpay"
+  );
+}
+
+// =====================================================
+// VALIDATE CHECKOUT ATTEMPT ALLOCATION
+// =====================================================
+
+function validateAttemptAllocation(attempt, order) {
+  if (attempt.paymentMethod !== order.paymentMethod) {
+    throw new Error(
+      "Checkout attempt payment method mismatch"
+    );
+  }
+
+  const expectedAmount =
+    getExpectedRazorpayAmount(order);
+
+  if (attempt.amountInPaise !== expectedAmount) {
+    throw new Error(
+      "Checkout attempt Razorpay amount mismatch"
+    );
+  }
+
+  // Older Razorpay attempts may not
+  // contain paymentBreakdown.
+  if (
+    order.paymentMethod === "Razorpay" &&
+    !attempt.paymentBreakdown
+  ) {
+    return expectedAmount;
+  }
+
+  const attemptBreakdown = attempt.paymentBreakdown;
+  const orderBreakdown = order.paymentBreakdown;
+
+  if (!attemptBreakdown || !orderBreakdown) {
+    throw new Error(
+      "Checkout payment breakdown is missing"
+    );
+  }
+
+  if (
+    attemptBreakdown.totalPaise !==
+      orderBreakdown.totalPaise ||
+    attemptBreakdown.walletPaise !==
+      orderBreakdown.walletPaise ||
+    attemptBreakdown.razorpayPaise !==
+      orderBreakdown.razorpayPaise
+  ) {
+    throw new Error(
+      "Checkout and order payment allocations do not match"
+    );
+  }
+
+  return expectedAmount;
+}
+
+// =====================================================
+// LINK RAZORPAY ORDER TRANSACTION
+// =====================================================
+
 // Razorpay order creation has already happened.
-// This transaction only updates MongoDB.
+// This function only updates MongoDB.
+//
+// Both database updates must succeed together.
+// Otherwise, MongoDB rolls back the transaction.
+
 const linkRazorpayOrderTransaction = async ({
   attemptId,
   userId,
@@ -41,12 +188,12 @@ const linkRazorpayOrderTransaction = async ({
     throw new Error("Invalid Razorpay order ID");
   }
 
-  // 3. Validate amount
+  // 3. Validate Razorpay amount
   if (
     !Number.isSafeInteger(amountInPaise) ||
     amountInPaise < 100
   ) {
-    throw new Error("Invalid payment amount");
+    throw new Error("Invalid Razorpay payment amount");
   }
 
   const session = await mongoose.startSession();
@@ -60,6 +207,9 @@ const linkRazorpayOrderTransaction = async ({
         _id: attemptId,
         user: userId,
         order: orderId,
+        paymentMethod: {
+          $in: RAZORPAY_METHODS,
+        },
         status: "Creating Payment",
         razorpayOrderId: null,
         amountInPaise,
@@ -73,9 +223,6 @@ const linkRazorpayOrderTransaction = async ({
       }
 
       // 5. Check recovery Razorpay ID
-      //
-      // A different existing ID indicates
-      // an uncertain or conflicting payment.
       if (
         attempt.recoveryRazorpayOrderId &&
         attempt.recoveryRazorpayOrderId !==
@@ -86,10 +233,11 @@ const linkRazorpayOrderTransaction = async ({
         );
       }
 
-      // 6. Verify Loomzi order
+      // 6. Verify pending Loomzi order
       const order = await Order.findOne({
         _id: orderId,
         user: userId,
+        paymentMethod: attempt.paymentMethod,
         paymentStatus: "Pending",
         orderStatus: "Pending",
         razorpayOrderId: null,
@@ -102,20 +250,17 @@ const linkRazorpayOrderTransaction = async ({
         );
       }
 
-      const expectedAmountInPaise = Math.round(
-        order.totalAmount * 100
-      );
+      // 7. Validate amount and allocation
+      const expectedAmountInPaise =
+        validateAttemptAllocation(attempt, order);
 
-      if (
-        !Number.isSafeInteger(expectedAmountInPaise) ||
-        expectedAmountInPaise !== amountInPaise
-      ) {
+      if (expectedAmountInPaise !== amountInPaise) {
         throw new Error(
-          "Loomzi order amount does not match checkout"
+          "Razorpay amount does not match order allocation"
         );
       }
 
-      // 7. Verify stock reservation
+      // 8. Verify active stock reservation
       const reservation =
         await StockReservation.findOne({
           order: orderId,
@@ -132,12 +277,13 @@ const linkRazorpayOrderTransaction = async ({
         );
       }
 
-      // 8. Link Razorpay order to Loomzi order
+      // 9. Link Razorpay order ID to Loomzi order
       const updatedOrder =
         await Order.findOneAndUpdate(
           {
             _id: orderId,
             user: userId,
+            paymentMethod: order.paymentMethod,
             paymentStatus: "Pending",
             orderStatus: "Pending",
             razorpayOrderId: null,
@@ -161,13 +307,14 @@ const linkRazorpayOrderTransaction = async ({
         );
       }
 
-      // 9. Link Razorpay order to checkout attempt
+      // 10. Link Razorpay order ID to checkout attempt
       const updatedAttempt =
         await CheckoutAttempt.findOneAndUpdate(
           {
             _id: attemptId,
             user: userId,
             order: orderId,
+            paymentMethod: order.paymentMethod,
             status: "Creating Payment",
             razorpayOrderId: null,
             amountInPaise,
@@ -202,9 +349,10 @@ const linkRazorpayOrderTransaction = async ({
         );
       }
 
-      // 10. Return linked payment details
+      // 11. Return linked payment details
       result = {
         orderId: updatedOrder._id,
+        paymentMethod: order.paymentMethod,
         razorpayOrderId,
         amountInPaise,
         currency: "INR",

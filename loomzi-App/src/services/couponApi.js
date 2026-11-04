@@ -1,5 +1,5 @@
 
-const API_URL = "http://localhost:5000/api";
+const API_URL = "/api";
 
 export const validateCoupon = async (code) => {
   const response = await fetch(

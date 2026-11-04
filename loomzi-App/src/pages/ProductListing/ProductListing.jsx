@@ -8,7 +8,7 @@ import { getRatingSummaries } from "../../services/reviewApi";
 
 import "./ProductListing.css";
 
-const API_URL = "http://localhost:5000";
+const API_URL = "";
 const ITEMS_PER_PAGE = 9;
 const FETCH_LIMIT = 100;
 

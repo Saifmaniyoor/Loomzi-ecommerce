@@ -2,6 +2,7 @@
 const mongoose = require("mongoose");
 
 const Product = require("../models/Product");
+const CheckoutAttempt = require("../models/CheckoutAttempt");
 
 const {
   calculateFinalAmount,
@@ -23,15 +24,86 @@ const checkoutAttemptServices = require(
 );
 
 const {
+  reserveForPurchase,
+} = require("./walletLedgerService");
+
+const {
   validateCouponForCheckout,
 } = require("./couponValidationServices");
 
-// NEW: Shipping validation service
 const {
   validateShippingForCheckout,
 } = require("./shippingValidationServices");
 
-// Create pending order and reserve stock atomically.
+// =====================================================
+// HELPERS
+// =====================================================
+
+function validatePaymentBreakdown({
+  paymentMethod,
+  paymentBreakdown,
+  totalPaise,
+}) {
+  if (
+    ![
+      "Razorpay",
+      "Wallet",
+      "Wallet+Razorpay",
+    ].includes(paymentMethod)
+  ) {
+    throw new Error("Unsupported checkout payment method");
+  }
+
+  if (
+    !paymentBreakdown ||
+    !Number.isSafeInteger(paymentBreakdown.totalPaise) ||
+    !Number.isSafeInteger(paymentBreakdown.walletPaise) ||
+    !Number.isSafeInteger(paymentBreakdown.razorpayPaise)
+  ) {
+    throw new Error("Invalid payment breakdown");
+  }
+
+  const {
+    totalPaise: breakdownTotal,
+    walletPaise,
+    razorpayPaise,
+  } = paymentBreakdown;
+
+  if (
+    breakdownTotal !== totalPaise ||
+    walletPaise < 0 ||
+    razorpayPaise < 0 ||
+    walletPaise + razorpayPaise !== totalPaise
+  ) {
+    throw new Error("Payment breakdown total mismatch");
+  }
+
+  if (
+    paymentMethod === "Razorpay" &&
+    (walletPaise !== 0 || razorpayPaise !== totalPaise)
+  ) {
+    throw new Error("Invalid Razorpay payment allocation");
+  }
+
+  if (
+    paymentMethod === "Wallet" &&
+    (walletPaise !== totalPaise || razorpayPaise !== 0)
+  ) {
+    throw new Error("Invalid wallet payment allocation");
+  }
+
+  if (
+    paymentMethod === "Wallet+Razorpay" &&
+    (walletPaise <= 0 || razorpayPaise < 100)
+  ) {
+    throw new Error("Invalid split payment allocation");
+  }
+}
+
+// =====================================================
+// CREATE PENDING ORDER AND RESERVE FUNDS + STOCK
+// =====================================================
+
 const createPendingOrderWithReservation = async ({
   attemptId,
   userId,
@@ -43,10 +115,17 @@ const createPendingOrderWithReservation = async ({
   totalAmount,
   cartSnapshotHash,
   amountInPaise,
+
+  // New arguments, provided by checkout orchestration.
+  paymentMethod = "Razorpay",
+  paymentBreakdown = null,
 }) => {
-  // 1. Validate checkout attempt ID
-  if (!mongoose.isValidObjectId(attemptId)) {
-    throw new Error("Invalid checkout attempt ID");
+  // 1. Validate IDs
+  if (
+    !mongoose.isValidObjectId(attemptId) ||
+    !mongoose.isValidObjectId(userId)
+  ) {
+    throw new Error("Invalid checkout attempt or user ID");
   }
 
   // 2. Validate order items
@@ -62,7 +141,7 @@ const createPendingOrderWithReservation = async ({
     throw new Error("Invalid cart snapshot hash");
   }
 
-  // 4. Validate payment amount
+  // 4. Validate complete order amount
   if (
     typeof totalAmount !== "number" ||
     !Number.isFinite(totalAmount) ||
@@ -71,15 +150,17 @@ const createPendingOrderWithReservation = async ({
     amountInPaise < 100 ||
     Math.round(totalAmount * 100) !== amountInPaise
   ) {
-    throw new Error("Invalid payment amount");
+    throw new Error("Invalid checkout amount");
   }
 
-  // 5. Validate item prices and calculate subtotal
+  // 5. Calculate and validate subtotal
   const calculatedSubtotal = Math.round(
     items.reduce((sum, item) => {
-      const price = item.price;
-      const quantity = item.quantity;
-      const lineTotal = item.lineTotal;
+      const {
+        price,
+        quantity,
+        lineTotal,
+      } = item;
 
       if (
         typeof price !== "number" ||
@@ -100,7 +181,6 @@ const createPendingOrderWithReservation = async ({
     }, 0) * 100
   ) / 100;
 
-  // 6. Verify order subtotal
   if (
     typeof subtotal !== "number" ||
     !Number.isFinite(subtotal) ||
@@ -110,7 +190,7 @@ const createPendingOrderWithReservation = async ({
     throw new Error("Order subtotal mismatch");
   }
 
-  // 7. Verify discount and final payment amount
+  // 6. Recalculate total
   const discount = coupon?.discountAmount ?? 0;
 
   const verifiedPayment = calculateFinalAmount({
@@ -126,14 +206,46 @@ const createPendingOrderWithReservation = async ({
     throw new Error("Checkout payment amount mismatch");
   }
 
-  // 8. Start MongoDB session
+  // 7. Default legacy Razorpay allocation
+  const allocation =
+    paymentBreakdown ??
+    (paymentMethod === "Razorpay"
+      ? {
+          totalPaise: amountInPaise,
+          walletPaise: 0,
+          razorpayPaise: amountInPaise,
+        }
+      : null);
+
+  validatePaymentBreakdown({
+    paymentMethod,
+    paymentBreakdown: allocation,
+    totalPaise: amountInPaise,
+  });
+
   const session = await mongoose.startSession();
 
   let createdOrder = null;
 
   try {
     await session.withTransaction(async () => {
-      // 9. Validate current coupon rules
+      // 8. Validate checkout attempt before
+      // reserving stock or wallet funds.
+      const attempt = await CheckoutAttempt.findOne({
+        _id: attemptId,
+        user: userId,
+        order: null,
+        status: "Processing",
+        paymentMethod,
+      }).session(session);
+
+      if (!attempt) {
+        throw new Error(
+          "Checkout attempt unavailable or payment method mismatch"
+        );
+      }
+
+      // 9. Validate coupon rules
       await validateCouponForCheckout({
         couponCode: coupon?.code || null,
         subtotal: calculatedSubtotal,
@@ -141,13 +253,13 @@ const createPendingOrderWithReservation = async ({
         session,
       });
 
-      // 10. NEW: Validate current shipping charge
+      // 10. Validate shipping charge
       await validateShippingForCheckout({
         expectedShippingCharge: shippingCharge,
         session,
       });
 
-      // 11. Validate categories and reserve stock
+      // 11. Validate products and reserve stock
       for (const item of items) {
         const quantity = Number(item.quantity);
 
@@ -155,13 +267,14 @@ const createPendingOrderWithReservation = async ({
           !mongoose.isValidObjectId(item.productId) ||
           !Number.isInteger(quantity) ||
           quantity < 1 ||
-          (item.variantId &&
-            !mongoose.isValidObjectId(item.variantId))
+          (
+            item.variantId &&
+            !mongoose.isValidObjectId(item.variantId)
+          )
         ) {
           throw new Error("Invalid order item");
         }
 
-        // Read product inside transaction
         const product = await Product.findById(
           item.productId
         ).session(session);
@@ -172,20 +285,19 @@ const createPendingOrderWithReservation = async ({
           );
         }
 
-        // Validate category availability
         await categoryReservationServices
           .validateCategoryForCheckout({
             categoryId: product.category,
             session,
           });
 
-        // Reserve stock using expected price
         const updatedProduct =
           await inventoryServices.reserveStock({
             productId: item.productId,
             variantId: item.variantId || null,
             quantity,
-            expectedPrice: item.originalPrice ?? item.price,
+            expectedPrice:
+              item.originalPrice ?? item.price,
             session,
           });
 
@@ -197,7 +309,6 @@ const createPendingOrderWithReservation = async ({
           );
         }
 
-        // Verify category did not change
         if (
           String(updatedProduct.category) !==
           String(product.category)
@@ -217,7 +328,8 @@ const createPendingOrderWithReservation = async ({
         color: item.color || "",
         size: item.size || "",
         price: item.price,
-        originalPrice: item.originalPrice ?? item.price,
+        originalPrice:
+          item.originalPrice ?? item.price,
         offerDiscount: item.offerDiscount || 0,
         appliedOffer: item.appliedOffer || null,
         quantity: item.quantity,
@@ -225,7 +337,7 @@ const createPendingOrderWithReservation = async ({
         status: "Pending",
       }));
 
-      // 13. Create pending Loomzi order
+      // 13. Create pending order
       createdOrder = await orderServices.createOrder(
         {
           user: userId,
@@ -239,14 +351,34 @@ const createPendingOrderWithReservation = async ({
           shippingCharge,
           tax: 0,
           totalAmount: verifiedPayment.totalAmount,
-          paymentMethod: "Razorpay",
+          paymentMethod,
+          paymentBreakdown: {
+            totalPaise: allocation.totalPaise,
+            walletPaise: allocation.walletPaise,
+            razorpayPaise: allocation.razorpayPaise,
+            walletStatus:
+              allocation.walletPaise > 0
+                ? "Reserved"
+                : "Not Used",
+          },
           paymentStatus: "Pending",
           orderStatus: "Pending",
         },
         session
       );
 
-      // 14. Create stock reservation (15 minutes)
+      // 14. Reserve wallet contribution
+      // in the same MongoDB transaction.
+      if (allocation.walletPaise > 0) {
+        await reserveForPurchase({
+          userId,
+          orderId: createdOrder._id,
+          amountPaise: allocation.walletPaise,
+          session,
+        });
+      }
+
+      // 15. Reserve stock for 15 minutes
       const expiresAt = new Date(
         Date.now() + 15 * 60 * 1000
       );
@@ -266,16 +398,66 @@ const createPendingOrderWithReservation = async ({
         session
       );
 
-      // 15. Link checkout attempt to order
-      const linkedAttempt =
-        await checkoutAttemptServices.linkAttemptToOrder(
-          attemptId,
-          userId,
-          createdOrder._id,
-          cartSnapshotHash,
-          verifiedPayment.amountInPaise,
-          session
-        );
+      // 16. Link attempt to order
+      let linkedAttempt;
+
+      if (paymentMethod === "Razorpay") {
+        // Preserve existing Razorpay linking logic.
+        linkedAttempt =
+          await checkoutAttemptServices.linkAttemptToOrder(
+            attemptId,
+            userId,
+            createdOrder._id,
+            cartSnapshotHash,
+            verifiedPayment.amountInPaise,
+            session
+          );
+
+        if (linkedAttempt) {
+          linkedAttempt.paymentBreakdown = {
+            totalPaise: allocation.totalPaise,
+            walletPaise: 0,
+            razorpayPaise: allocation.razorpayPaise,
+          };
+
+          await linkedAttempt.save({ session });
+        }
+      } else {
+        // Wallet and split payment attempts.
+        linkedAttempt =
+          await CheckoutAttempt.findOneAndUpdate(
+            {
+              _id: attemptId,
+              user: userId,
+              paymentMethod,
+              order: null,
+              status: "Processing",
+              razorpayOrderId: null,
+              recoveryRazorpayOrderId: null,
+            },
+            {
+              $set: {
+                order: createdOrder._id,
+                cartSnapshotHash,
+                amountInPaise:
+                  allocation.razorpayPaise > 0
+                    ? allocation.razorpayPaise
+                    : null,
+                paymentBreakdown: {
+                  totalPaise: allocation.totalPaise,
+                  walletPaise: allocation.walletPaise,
+                  razorpayPaise: allocation.razorpayPaise,
+                },
+                currency: "INR",
+              },
+            },
+            {
+              new: true,
+              runValidators: true,
+              session,
+            }
+          );
+      }
 
       if (!linkedAttempt) {
         throw new Error(
@@ -284,10 +466,8 @@ const createPendingOrderWithReservation = async ({
       }
     });
 
-    // 16. Return created order
     return createdOrder;
   } finally {
-    // 17. Close MongoDB session
     await session.endSession();
   }
 };

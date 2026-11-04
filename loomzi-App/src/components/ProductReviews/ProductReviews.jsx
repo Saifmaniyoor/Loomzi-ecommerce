@@ -1,3 +1,4 @@
+import { confirmDialog } from "../Dialog/dialogService.js";
 import { useEffect, useState } from "react";
 import { createReview, deleteReview, getProductReviews, getReviewEligibility, updateReview } from "../../services/reviewApi";
 import "./ProductReviews.css";
@@ -41,7 +42,7 @@ export default function ProductReviews({ productId }) {
   }
 
   async function remove() {
-    if (!eligibility?.review || !window.confirm("Delete your review?")) return;
+    if (!eligibility?.review || !await confirmDialog("Delete your review?")) return;
     setBusy(true); setError("");
     try { await deleteReview(eligibility.review._id); setMessage("Review deleted."); setRefresh(x => x + 1); }
     catch (err) { setError(err.message); }

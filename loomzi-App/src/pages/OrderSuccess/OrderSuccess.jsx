@@ -62,6 +62,22 @@ function OrderSuccess() {
     );
   }
 
+  // A pending online payment is not a successful purchase.
+  // Wallet funds may be reserved while Razorpay verification is pending.
+  const onlinePayment = ["Wallet", "Wallet+Razorpay", "Razorpay"].includes(order.paymentMethod);
+  if (onlinePayment && order.paymentStatus !== "Paid") {
+    return (
+      <main className="order-success-page">
+        <div className="order-success-container">
+          <h1>Payment confirmation pending</h1>
+          <p>Order #{order.id || order._id} has not been confirmed as paid.</p>
+          <p>If you used your wallet, its contribution may be reserved. Do not place another order until this payment is checked.</p>
+          <Link to={`/orders/${orderId}`} className="order-success-track">View Order Status</Link>
+        </div>
+      </main>
+    );
+  }
+
   return (
     <main className="order-success-page">
       <div className="order-success-container">
@@ -177,7 +193,7 @@ function OrderSuccess() {
         </div>
 
         <div className="order-success-actions">
-          <Link to="/orders" className="order-success-track">
+          <Link to="/my-orders" className="order-success-track">
             Track My Order
           </Link>
 

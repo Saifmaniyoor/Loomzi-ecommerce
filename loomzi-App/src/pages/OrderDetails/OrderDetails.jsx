@@ -1,3 +1,4 @@
+import { confirmDialog, showDialog } from "../../components/Dialog/dialogService.js";
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { getOrderById, cancelOrder } from "../../services/orderApi";
@@ -48,29 +49,37 @@ function OrderDetails() {
   const handleCancelOrder = async () => {
     if (!order || cancelling) return;
 
-    const confirmed = window.confirm(
+    const confirmed = await confirmDialog(
       "Are you sure you want to cancel this order?",
+      { confirmText: "Cancel Order", cancelText: "Keep Order" },
     );
 
     if (!confirmed) return;
 
+    // Choosing a refund method requires explicit consent; closing the dialog aborts cancellation.
+    let refundMethod = "original";
+    if (["Razorpay", "Wallet+Razorpay"].includes(order.paymentMethod) && order.paymentStatus === "Paid") {
+      const choice = await showDialog({
+        title: "Choose refund method",
+        message: "Where would you like your refund? For split payments, the original wallet contribution is always returned to your wallet. Choose where to receive the Razorpay contribution.",
+        type: "info",
+        actions: [
+          { label: "Original payment", value: "original", style: "secondary" },
+          { label: "Loomzi wallet", value: "wallet", style: "primary" },
+        ],
+      });
+      if (!choice) return;
+      refundMethod = choice;
+    }
     setCancelling(true);
     setCancelError("");
     setCancelSuccess("");
 
     try {
-      await cancelOrder(order.id);
-
-      setOrder((previousOrder) => ({
-        ...previousOrder,
-        orderStatus: "Cancelled",
-        items: previousOrder.items.map((item) => ({
-          ...item,
-          status: "Cancelled",
-        })),
-      }));
-
-      setCancelSuccess("Your order has been cancelled successfully.");
+      const result = await cancelOrder(order.id, refundMethod);
+      const refreshedOrder = await getOrderById(order.id);
+      setOrder(refreshedOrder);
+      setCancelSuccess(result.message || "Your order has been cancelled successfully.");
     } catch (err) {
       setCancelError(err.message);
     } finally {
@@ -101,12 +110,7 @@ function OrderDetails() {
   const statusSteps = ["Pending", "Confirmed", "Processing", "Shipped", "Out for Delivery", "Delivered"];
 
   const currentStatus = order.orderStatus;
-  const canCancel =
-    ["Pending", "Confirmed", "Processing"].includes(order.orderStatus) &&
-    ((order.paymentMethod === "COD" && order.paymentStatus === "Pending") ||
-      (order.paymentMethod === "Razorpay" &&
-        order.paymentStatus === "Paid" && Boolean(order.razorpayPaymentId)));
-
+  const canCancel = order.canCancel === true;
 
   const isCancelled =
     currentStatus?.toLowerCase() === "cancelled" ||

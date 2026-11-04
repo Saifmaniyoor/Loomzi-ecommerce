@@ -1,6 +1,6 @@
 import { Fragment, useCallback, useEffect, useState } from "react";
 import "./OrderManagement.css";
-const API = "http://localhost:5000/api/admin/orders";
+const API = "/api/admin/orders";
 const statuses = ["Pending", "Confirmed", "Processing", "Shipped", "Out for Delivery", "Delivered", "Cancelled"];
 async function api(path = "", options = {}) {
   const response = await fetch(API + path, { credentials: "include", ...options, headers: { "Content-Type": "application/json", ...options.headers } });
@@ -19,6 +19,9 @@ export default function OrderManagement() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
+  const [cancelReason, setCancelReason] = useState("");
+  const [refundMethod, setRefundMethod] = useState("original");
+  const [shipmentRecovered, setShipmentRecovered] = useState(false);
   const load = useCallback(async () => {
     try {
       const data = await api(`?page=${page}&status=${encodeURIComponent(filter)}`);
@@ -31,6 +34,9 @@ export default function OrderManagement() {
     try {
       const { order } = await api(`/${id}`);
       setSelected(order);
+      setCancelReason("");
+      setRefundMethod("original");
+      setShipmentRecovered(false);
       setForm({ status: order.orderStatus, note: "", courier: order.tracking?.courier || "", trackingNumber: order.tracking?.trackingNumber || "", trackingUrl: order.tracking?.trackingUrl || "", estimatedDelivery: order.tracking?.estimatedDelivery ? new Date(order.tracking.estimatedDelivery).toISOString().slice(0, 10) : "" });
     } catch (e) { setError(e.message); }
   };
@@ -42,6 +48,20 @@ export default function OrderManagement() {
     } catch (e) { setError(e.message); } finally { setBusy(false); }
   };
   const set = (key, value) => setForm((previous) => ({ ...previous, [key]: value }));
+  const canAdminCancel = selected && ["Pending", "Confirmed", "Processing", "Shipped", "Out for Delivery"].includes(selected.orderStatus);
+  const isShipped = selected && ["Shipped", "Out for Delivery"].includes(selected.orderStatus);
+  const cancelSelectedOrder = async () => {
+    if (!selected || busy) return;
+    if (!cancelReason.trim()) { setError("Enter a cancellation reason"); return; }
+    if (isShipped && !shipmentRecovered) { setError("Confirm that the courier has intercepted/returned the parcel"); return; }
+    if (!window.confirm("Cancel this order and start the applicable refund? This cannot be undone.")) return;
+    setBusy(true); setError(""); setNotice("");
+    try {
+      const { order, message } = await api(`/${selected._id}/cancel`, { method: "PATCH", body: JSON.stringify({ reason: cancelReason.trim(), refundMethod, shipmentRecovered }) });
+      setSelected(order); setNotice(message || "Order cancelled"); setCancelReason(""); setShipmentRecovered(false); await load();
+    } catch (e) { setError(e.message); }
+    finally { setBusy(false); }
+  };
   return <main className="loomzi-order-admin">
     <h1>Order Management</h1><p>Update delivery progress and courier details. Customers can view these updates in My Orders.</p>
     {error && <p role="alert" className="oa-error">{error}</p>}{notice && <p role="status" className="oa-success">{notice}</p>}
@@ -74,6 +94,14 @@ export default function OrderManagement() {
         <label className="oa-wide">Delivery update note<textarea maxLength={500} value={form.note} onChange={(e) => set("note", e.target.value)} placeholder="Package dispatched from warehouse" /></label>
         <button disabled={busy || selected.orderStatus === "Cancelled"} type="submit">{busy ? "Saving..." : "Save delivery update"}</button>
       </form>
+      {canAdminCancel && <div className="oa-cancel-panel">
+        <h3>Cancel order</h3>
+        <p>Delivered orders must be handled through returns. For shipped orders, confirm courier interception or parcel recovery before cancelling.</p>
+        <label>Cancellation reason<textarea value={cancelReason} maxLength={450} onChange={(e) => setCancelReason(e.target.value)} placeholder="Reason for admin cancellation" /></label>
+        {selected.paymentStatus === "Paid" && <label>Refund destination<select value={refundMethod} onChange={(e) => setRefundMethod(e.target.value)}><option value="original">Original payment method</option><option value="wallet">Loomzi wallet</option></select></label>}
+        {isShipped && <label className="oa-recovery-check"><input type="checkbox" checked={shipmentRecovered} onChange={(e) => setShipmentRecovered(e.target.checked)} /> I confirm the courier has intercepted/returned the parcel and the items are safe to restock.</label>}
+        <button type="button" className="oa-cancel-order-button" disabled={busy || !cancelReason.trim() || (isShipped && !shipmentRecovered)} onClick={cancelSelectedOrder}>{busy ? "Cancelling..." : "Cancel order"}</button>
+      </div>}
       <h3>Update history</h3>{(selected.statusHistory || []).slice().reverse().map((h, i) => <p key={i}><strong>{h.status}</strong> · {new Date(h.changedAt).toLocaleString("en-IN")}{h.note ? ` — ${h.note}` : ""}</p>)}
 </section>
             </td></tr>

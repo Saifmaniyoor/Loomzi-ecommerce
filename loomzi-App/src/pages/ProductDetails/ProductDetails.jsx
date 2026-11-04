@@ -25,7 +25,7 @@ import {
 import "./ProductDetails.css";
 import "../../components/ProductPrice/OfferTag.css";
 
-const API_URL = "http://localhost:5000";
+const API_URL = "";
 
 const tabs = ["Description", "Size Guide", "Reviews"];
 

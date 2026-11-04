@@ -1,3 +1,4 @@
+import { confirmDialog } from "../../components/Dialog/dialogService.js";
 
 import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
@@ -111,7 +112,7 @@ function Cart() {
   };
 
   const handleClearCart = async () => {
-    const confirmed = window.confirm(
+    const confirmed = await confirmDialog(
       "Remove all items from your cart?"
     );
 

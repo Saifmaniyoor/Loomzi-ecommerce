@@ -13,7 +13,8 @@ const isValidAmount = (amount) => {
   );
 };
 
-// Calculate coupon discount
+// Calculate the complete checkout amount.
+// Wallet and Razorpay allocations are calculated separately.
 const calculateCouponDiscount = ({
   subtotal,
   coupon,

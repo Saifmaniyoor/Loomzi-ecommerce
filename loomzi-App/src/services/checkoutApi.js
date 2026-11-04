@@ -1,12 +1,22 @@
 
-const API_URL = "http://localhost:5000/api/checkout";
+const API_BASE =
+  import.meta.env.VITE_API_BASE_URL || "/api";
+
+const CHECKOUT_URL = `${API_BASE}/checkout`;
+
+// ======================================
+// RESPONSE HANDLER
+// ======================================
 
 const handleResponse = async (response) => {
-  const data = await response.json();
+  const data = await response
+    .json()
+    .catch(() => ({}));
 
   if (!response.ok) {
     throw new Error(
-      data.message || "Something went wrong"
+      data.message ||
+        `Request failed (HTTP ${response.status})`
     );
   }
 
@@ -14,23 +24,240 @@ const handleResponse = async (response) => {
 };
 
 // ======================================
-// Checkout Preview
+// CHECKOUT REQUEST BODY
 // ======================================
-export const previewCheckout = async ({
+
+const buildCheckoutBody = ({
   addressId,
   couponCode = "",
+  useWallet = false,
 }) => {
+  if (!addressId) {
+    throw new Error(
+      "Please select a delivery address"
+    );
+  }
+
   const body = {
     addressId,
   };
 
-  // Include coupon only when provided.
-  if (couponCode.trim()) {
-    body.couponCode = couponCode.trim().toUpperCase();
+  const normalizedCoupon = String(
+    couponCode || ""
+  )
+    .trim()
+    .toUpperCase();
+
+  if (normalizedCoupon) {
+    body.couponCode = normalizedCoupon;
+  }
+
+  // Include only when selected to preserve
+  // existing Razorpay request hashing.
+  if (useWallet === true) {
+    body.useWallet = true;
+  }
+
+  return body;
+};
+
+// ======================================
+// COMMON POST REQUEST
+// ======================================
+
+const checkoutPost = async (
+  path,
+  body,
+  idempotencyKey
+) => {
+  const headers = {
+    "Content-Type": "application/json",
+  };
+
+  if (idempotencyKey) {
+    headers["Idempotency-Key"] =
+      idempotencyKey;
   }
 
   const response = await fetch(
-    `${API_URL}/preview`,
+    `${CHECKOUT_URL}${path}`,
+    {
+      method: "POST",
+      credentials: "include",
+      headers,
+      body: JSON.stringify(body),
+    }
+  );
+
+  return handleResponse(response);
+};
+
+// ======================================
+// CHECKOUT PREVIEW
+// ======================================
+
+export const previewCheckout = async ({
+  addressId,
+  couponCode = "",
+}) => {
+  const body = buildCheckoutBody({
+    addressId,
+    couponCode,
+  });
+
+  return checkoutPost("/preview", body);
+};
+
+// ======================================
+// CASH ON DELIVERY
+// ======================================
+
+export const placeCODOrder = async ({
+  addressId,
+  couponCode = "",
+  idempotencyKey,
+}) => {
+  if (!idempotencyKey) {
+    throw new Error(
+      "Idempotency key is required"
+    );
+  }
+
+  const body = buildCheckoutBody({
+    addressId,
+    couponCode,
+  });
+
+  return checkoutPost(
+    "/cod",
+    body,
+    idempotencyKey
+  );
+};
+
+// ======================================
+// COD CHECKOUT STATUS
+// ======================================
+
+export const getCODCheckoutStatus = async (
+  idempotencyKey
+) => {
+  if (!idempotencyKey) {
+    throw new Error(
+      "Idempotency key is required"
+    );
+  }
+
+  const response = await fetch(
+    `${CHECKOUT_URL}/cod/status`,
+    {
+      method: "GET",
+      credentials: "include",
+      headers: {
+        "Idempotency-Key":
+          idempotencyKey,
+      },
+    }
+  );
+
+  return handleResponse(response);
+};
+
+// ======================================
+// PREPARE ONLINE / WALLET CHECKOUT
+// ======================================
+
+export const prepareRazorpayCheckout = (
+  body,
+  idempotencyKey
+) => {
+  if (!idempotencyKey) {
+    throw new Error(
+      "Idempotency key is required"
+    );
+  }
+
+  return checkoutPost(
+    "/prepare",
+    buildCheckoutBody(body),
+    idempotencyKey
+  );
+};
+
+// ======================================
+// VALIDATE ONLINE / WALLET CHECKOUT
+// ======================================
+
+export const validateRazorpayCheckout = (
+  body,
+  idempotencyKey
+) => {
+  if (!idempotencyKey) {
+    throw new Error(
+      "Idempotency key is required"
+    );
+  }
+
+  return checkoutPost(
+    "/validate-payment",
+    buildCheckoutBody(body),
+    idempotencyKey
+  );
+};
+
+// ======================================
+// CREATE PENDING ORDER
+// ======================================
+
+export const createPendingRazorpayOrder = (
+  body,
+  idempotencyKey
+) => {
+  if (!idempotencyKey) {
+    throw new Error(
+      "Idempotency key is required"
+    );
+  }
+
+  return checkoutPost(
+    "/pending-order",
+    buildCheckoutBody(body),
+    idempotencyKey
+  );
+};
+
+// ======================================
+// CREATE RAZORPAY GATEWAY ORDER
+// ======================================
+
+export const createRazorpayPaymentOrder = (
+  attemptId,
+  orderId
+) => {
+  if (!attemptId || !orderId) {
+    throw new Error(
+      "Checkout attempt ID and order ID are required"
+    );
+  }
+
+  return checkoutPost(
+    "/razorpay/order",
+    {
+      attemptId,
+      orderId,
+    }
+  );
+};
+
+// ======================================
+// CONFIRM RAZORPAY PAYMENT
+// ======================================
+
+export const confirmRazorpayCheckout = async (
+  body
+) => {
+  const response = await fetch(
+    `${API_BASE}/payments/confirm`,
     {
       method: "POST",
       credentials: "include",
@@ -44,85 +271,49 @@ export const previewCheckout = async ({
   return handleResponse(response);
 };
 
+// ======================================
+// CHECK RAZORPAY / SPLIT ORDER STATUS
+// ======================================
 
-// ======================================
-// Place COD Order
-// ======================================
-export const placeCODOrder = async ({
-  addressId,
-  couponCode = "",
-  idempotencyKey,
-}) => {
-  if (!idempotencyKey) {
-    throw new Error("Idempotency key is required");
+export const getRazorpayOrderStatus = async (
+  orderId
+) => {
+  if (!orderId) {
+    throw new Error(
+      "Order ID is required"
+    );
   }
 
-  const body = {
-    addressId,
-  };
-
-  if (couponCode.trim()) {
-    body.couponCode = couponCode.trim().toUpperCase();
-  }
-
-  const response = await fetch(`${API_URL}/cod`, {
-    method: "POST",
-    credentials: "include",
-    headers: {
-      "Content-Type": "application/json",
-      "Idempotency-Key": idempotencyKey,
-    },
-    body: JSON.stringify(body),
-  });
-
-  return handleResponse(response);
-};
-
-
-  // ======================================
-  // Check COD Checkout Status
-  // ======================================
-  export const getCODCheckoutStatus = async (idempotencyKey) => {
-    if (!idempotencyKey) {
-      throw new Error("Idempotency key is required");
-    }
-
-    const response = await fetch(`${API_URL}/cod/status`, {
+  const response = await fetch(
+    `${CHECKOUT_URL}/razorpay/status/${encodeURIComponent(
+      orderId
+    )}`,
+    {
       method: "GET",
       credentials: "include",
-      headers: {
-        "Idempotency-Key": idempotencyKey,
-      },
-    });
+    }
+  );
 
-    return handleResponse(response);
-  };
-
-
-const paymentAPI = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api";
-const paymentPost = async (path, body, key) => {
-  const response = await fetch(`${paymentAPI}${path}`, {
-    method: "POST", credentials: "include",
-    headers: { "Content-Type": "application/json", ...(key ? { "Idempotency-Key": key } : {}) },
-    body: JSON.stringify(body),
-  });
-  return handleResponse(response);
-};
-export const prepareRazorpayCheckout = (body, key) => paymentPost("/checkout/prepare", body, key);
-export const validateRazorpayCheckout = (body, key) => paymentPost("/checkout/validate-payment", body, key);
-export const createPendingRazorpayOrder = (body, key) => paymentPost("/checkout/pending-order", body, key);
-export const createRazorpayPaymentOrder = (attemptId, orderId) => paymentPost("/checkout/razorpay/order", { attemptId, orderId });
-export const confirmRazorpayCheckout = (body) => paymentPost("/payments/confirm", body);
-export const getRazorpayOrderStatus = async (orderId) => {
-  const response = await fetch(`${paymentAPI}/checkout/razorpay/status/${encodeURIComponent(orderId)}`, { credentials: "include" });
   return handleResponse(response);
 };
 
+// ======================================
+// RESUME EXISTING RAZORPAY PAYMENT
+// ======================================
 
+export const resumeRazorpayPayment = async (
+  orderId
+) => {
+  if (!orderId) {
+    throw new Error(
+      "Order ID is required"
+    );
+  }
 
-export const resumeRazorpayPayment = async (orderId) => {
   const response = await fetch(
-    `http://localhost:5000/api/payments/razorpay/resume/${encodeURIComponent(orderId)}`,
+    `${API_BASE}/payments/razorpay/resume/${encodeURIComponent(
+      orderId
+    )}`,
     {
       method: "POST",
       credentials: "include",
@@ -132,16 +323,5 @@ export const resumeRazorpayPayment = async (orderId) => {
     }
   );
 
-  const data = await response.json().catch(() => ({}));
-
-  if (!response.ok) {
-    throw new Error(
-      data.message ||
-      `Payment continuation failed (HTTP ${response.status})`
-    );
-  }
-
-  return data;
+  return handleResponse(response);
 };
-
-

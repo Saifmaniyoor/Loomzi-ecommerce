@@ -91,12 +91,13 @@ const validateProductData = (data) => {
   // Images
   if (
     !Array.isArray(images) ||
+    images.length < 3 ||
     images.some(
       (image) =>
         typeof image !== "string" || !image.trim()
     )
   ) {
-    return "Images must be an array of nonempty strings";
+    return "At least 3 valid product images are required.";
   }
 
   // Size type

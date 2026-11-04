@@ -1,8 +1,9 @@
+import { confirmDialog } from "../../../components/Dialog/dialogService.js";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import "./ProductManagement.css";
 
-const API_URL = "http://localhost:5000";
+const API_URL = "";
 
 function ProductManagement() {
   const [products, setProducts] = useState([]);
@@ -79,7 +80,7 @@ const getTotalStock = (product) => {
 const handleProductStatus = async (product) => {
   const action = product.isListed ? "unlist" : "list";
 
-  const confirmed = window.confirm(
+  const confirmed = await confirmDialog(
     `Are you sure you want to ${action} "${product.name}"?`
   );
 

@@ -74,8 +74,13 @@ function Register() {
     const newErrors = {};
 
     // Full Name
-    if (!formData.fullName.trim()) {
+    const normalizedName = formData.fullName.trim().replace(/\s+/g, " ");
+    if (!normalizedName) {
       newErrors.fullName = "Please enter your full name";
+    } else if (normalizedName.length < 2 || normalizedName.length > 80) {
+      newErrors.fullName = "Name must be between 2 and 80 characters";
+    } else if (!/^[\p{L}\p{M}]+(?:[ '-][\p{L}\p{M}]+)*$/u.test(normalizedName)) {
+      newErrors.fullName = "Use letters only. Spaces, hyphens and apostrophes are allowed";
     }
 
     // Email
@@ -102,9 +107,8 @@ function Register() {
     // Password
     if (!formData.password) {
       newErrors.password = "Please enter a password";
-    } else if (formData.password.length < 8) {
-      newErrors.password =
-        "Password must be at least 8 characters";
+    } else if (formData.password.length < 10 || !/[a-z]/.test(formData.password) || !/[A-Z]/.test(formData.password) || !/[0-9]/.test(formData.password) || !/[^A-Za-z0-9\s]/.test(formData.password) || /\s/.test(formData.password)) {
+      newErrors.password = "Use 10+ characters with uppercase, lowercase, a number and a symbol (no spaces)";
     }
 
     // Confirm Password
@@ -142,14 +146,14 @@ function Register() {
     try {
       // Send registration data to backend
       const response = await fetch(
-        "http://localhost:5000/api/auth/register",
+        "/api/auth/register",
         {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            fullName: formData.fullName.trim(),
+            fullName: formData.fullName.trim().replace(/\s+/g, " "),
             email: formData.email.trim().toLowerCase(),
             phone: formData.phone.trim(),
             password: formData.password,
@@ -283,6 +287,7 @@ function Register() {
                 id="fullName"
                 name="fullName"
                 placeholder="Jane Doe"
+                maxLength={80}
                 value={formData.fullName}
                 onChange={handleChange}
                 autoComplete="name"
@@ -385,7 +390,8 @@ function Register() {
                 type={showPassword ? "text" : "password"}
                 id="password"
                 name="password"
-                placeholder="••••••••"
+                minLength={10}
+                placeholder="10+ characters"
                 value={formData.password}
                 onChange={handleChange}
                 autoComplete="new-password"
@@ -410,6 +416,7 @@ function Register() {
                 )}
               </button>
             </div>
+            <p className="register-password-hint">10+ characters: uppercase, lowercase, number and symbol. No spaces.</p>
 
             {errors.password && (
               <p className="register-error">

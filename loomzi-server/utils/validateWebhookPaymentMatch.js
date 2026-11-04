@@ -3,14 +3,33 @@ const {
   validateRazorpayWebhookPayload,
 } = require("./razorpayWebhookPayload");
 
+// ==========================================
+// VALIDATE RAZORPAY WEBHOOK PAYMENT MATCH
+// ==========================================
+
+// This function compares a stored webhook
+// event with the payment being confirmed.
+//
+// IMPORTANT:
+// amountInPaise must come from trusted
+// backend order data.
+//
+// Razorpay-only:
+//   Full order amount.
+//
+// Wallet + Razorpay:
+//   Razorpay contribution only.
+//
+// Wallet-only payments must not call
+// this function.
+
 const validateWebhookPaymentMatch = ({
   event,
   razorpayOrderId,
   razorpayPaymentId,
   amountInPaise,
 }) => {
-  // 1. Only captured-payment webhooks can
-  // confirm an order.
+  // 1. Verify webhook event type
   if (
     !event ||
     event.eventType !== "payment.captured"
@@ -21,9 +40,35 @@ const validateWebhookPaymentMatch = ({
     };
   }
 
-  // 2. Validate the stored webhook payload.
+  // 2. Validate expected payment identifiers
+  if (
+    typeof razorpayOrderId !== "string" ||
+    !/^order_[a-zA-Z0-9]+$/.test(razorpayOrderId) ||
+    typeof razorpayPaymentId !== "string" ||
+    !/^pay_[a-zA-Z0-9]+$/.test(razorpayPaymentId)
+  ) {
+    return {
+      valid: false,
+      reason: "Invalid expected Razorpay identifiers",
+    };
+  }
+
+  // 3. Validate expected Razorpay amount
+  if (
+    !Number.isSafeInteger(amountInPaise) ||
+    amountInPaise < 100
+  ) {
+    return {
+      valid: false,
+      reason: "Invalid expected Razorpay amount",
+    };
+  }
+
+  // 4. Validate stored webhook payload
   const validation =
-    validateRazorpayWebhookPayload(event.payload);
+    validateRazorpayWebhookPayload(
+      event.payload
+    );
 
   if (
     !validation.valid ||
@@ -35,10 +80,10 @@ const validateWebhookPaymentMatch = ({
     };
   }
 
-  // 3. Compare the webhook's Razorpay order ID
-  // with the order being confirmed.
+  // 5. Compare Razorpay order ID
   if (
-    validation.razorpayOrderId !== razorpayOrderId
+    validation.razorpayOrderId !==
+    razorpayOrderId
   ) {
     return {
       valid: false,
@@ -46,9 +91,10 @@ const validateWebhookPaymentMatch = ({
     };
   }
 
-  // 4. Compare the Razorpay payment IDs.
+  // 6. Compare Razorpay payment ID
   if (
-    validation.razorpayPaymentId !== razorpayPaymentId
+    validation.razorpayPaymentId !==
+    razorpayPaymentId
   ) {
     return {
       valid: false,
@@ -56,19 +102,27 @@ const validateWebhookPaymentMatch = ({
     };
   }
 
-  // 5. Compare the payment amount in paise.
+  // 7. Compare exact captured amount
+  //
+  // For split payments, this must equal
+  // paymentBreakdown.razorpayPaise,
+  // NOT the full Loomzi order total.
   if (
-    !Number.isSafeInteger(amountInPaise) ||
-    validation.amountInPaise !== amountInPaise
+    !Number.isSafeInteger(
+      validation.amountInPaise
+    ) ||
+    validation.amountInPaise !==
+      amountInPaise
   ) {
     return {
       valid: false,
-      reason: "Payment amount mismatch",
+      reason: "Razorpay payment amount mismatch",
     };
   }
 
-  // Currency INR and captured status have
-  // already been checked by the validator.
+  // 8. Currency and captured status
+  // have already been validated by
+  // validateRazorpayWebhookPayload.
 
   return {
     valid: true,

@@ -7,19 +7,50 @@ const {
   verifyWebhookCapturedPayment,
 } = require("./webhookPaymentReconciliationServices");
 
-// Inspect a stored webhook and verify its payment
-// directly with Razorpay.
+// ==========================================
+// VERIFY RECOVERED WEBHOOK PAYMENT
+// ==========================================
+
+// READ-ONLY SERVICE.
 //
-// READ-ONLY:
-// Does not update orders, stock or webhook statuses.
+// Supports:
+// 1. Razorpay-only payments
+// 2. Wallet + Razorpay split payments
+//
+// Wallet-only orders do not use Razorpay
+// payment.captured webhooks.
+//
+// This function does NOT:
+// - Confirm orders
+// - Settle wallet reservations
+// - Update stock
+// - Update checkout attempts
+// - Change webhook status
+//
+// All payment amounts are verified
+// against Razorpay and trusted order data
+// by verifyWebhookCapturedPayment().
 
 const verifyRecoveredWebhookPayment = async (
   eventId
 ) => {
-  // 1. Inspect the stored webhook event
-  const inspection = await inspectWebhookEvent(eventId);
+  // 1. Validate event ID
+  if (
+    typeof eventId !== "string" ||
+    !eventId.trim()
+  ) {
+    return {
+      verified: false,
+      requiresReconciliation: true,
+      reason: "Invalid webhook event ID",
+    };
+  }
 
-  if (!inspection.found) {
+  // 2. Inspect stored webhook
+  const inspection =
+    await inspectWebhookEvent(eventId);
+
+  if (!inspection || !inspection.found) {
     return {
       verified: false,
       requiresReconciliation: true,
@@ -27,7 +58,8 @@ const verifyRecoveredWebhookPayment = async (
     };
   }
 
-  // 2. Ensure the payload can be inspected
+  // 3. Check whether the payment
+  // details can be inspected.
   if (!inspection.canInspectPayment) {
     return {
       verified: false,
@@ -38,9 +70,11 @@ const verifyRecoveredWebhookPayment = async (
     };
   }
 
-  // 3. Only captured-payment events are handled
-  // by this verification service.
-  if (inspection.eventType !== "payment.captured") {
+  // 4. Accept only captured-payment events
+  if (
+    inspection.eventType !==
+    "payment.captured"
+  ) {
     return {
       verified: false,
       requiresReconciliation: true,
@@ -49,23 +83,50 @@ const verifyRecoveredWebhookPayment = async (
     };
   }
 
-  // 4. Extract stored payment details
+  // 5. Extract stored payment details
   const {
     razorpayOrderId,
     razorpayPaymentId,
     amountInPaise,
-  } = inspection.paymentDetails;
+  } = inspection.paymentDetails || {};
 
-  if (!razorpayPaymentId) {
+  // 6. Validate Razorpay identifiers
+  if (
+    typeof razorpayOrderId !== "string" ||
+    !/^order_[A-Za-z0-9]+$/.test(
+      razorpayOrderId
+    ) ||
+    typeof razorpayPaymentId !== "string" ||
+    !/^pay_[A-Za-z0-9]+$/.test(
+      razorpayPaymentId
+    )
+  ) {
     return {
       verified: false,
       requiresReconciliation: true,
-      reason: "Razorpay payment ID is missing",
+      reason:
+        "Stored webhook payment identifiers are invalid",
     };
   }
 
-  // 5. Verify the payment against Razorpay
-  // and match it to a Loomzi order.
+  // 7. Validate stored payment amount
+  //
+  // For split payments, this represents
+  // only the Razorpay contribution.
+  if (
+    !Number.isSafeInteger(amountInPaise) ||
+    amountInPaise < 100
+  ) {
+    return {
+      verified: false,
+      requiresReconciliation: true,
+      reason:
+        "Stored webhook payment amount is invalid",
+    };
+  }
+
+  // 8. Verify payment directly with Razorpay
+  // and match it to the saved Loomzi order.
   try {
     const verification =
       await verifyWebhookCapturedPayment({
@@ -74,7 +135,10 @@ const verifyRecoveredWebhookPayment = async (
         amountInPaise,
       });
 
-    if (!verification || !verification.verified) {
+    if (
+      !verification ||
+      verification.verified !== true
+    ) {
       return {
         verified: false,
         requiresReconciliation: true,
@@ -84,7 +148,28 @@ const verifyRecoveredWebhookPayment = async (
       };
     }
 
-    // 6. Return verified order information
+    // 9. Verify returned payment identity
+    if (
+      verification.razorpayOrderId !==
+        razorpayOrderId ||
+      verification.razorpayPaymentId !==
+        razorpayPaymentId ||
+      verification.amountInPaise !==
+        amountInPaise ||
+      !verification.orderId ||
+      !verification.userId
+    ) {
+      return {
+        verified: false,
+        requiresReconciliation: true,
+        reason:
+          "Recovered payment verification details mismatch",
+      };
+    }
+
+    // 10. Return verified information
+    //
+    // No MongoDB changes happen here.
     return {
       verified: true,
       requiresReconciliation: false,
@@ -92,14 +177,23 @@ const verifyRecoveredWebhookPayment = async (
       eventType: inspection.eventType,
       orderId: verification.orderId,
       userId: verification.userId,
-      razorpayOrderId: verification.razorpayOrderId,
-      razorpayPaymentId: verification.razorpayPaymentId,
-      amountInPaise: verification.amountInPaise,
-      alreadyPaid: verification.alreadyPaid,
+      razorpayOrderId:
+        verification.razorpayOrderId,
+      razorpayPaymentId:
+        verification.razorpayPaymentId,
+      amountInPaise:
+        verification.amountInPaise,
+      currency: verification.currency,
+      paymentStatus:
+        verification.paymentStatus,
+      alreadyPaid:
+        verification.alreadyPaid === true,
     };
   } catch (error) {
-    // Network or provider errors are uncertain.
-    // Never interpret them as payment failure.
+    // Provider or network failures are
+    // uncertain payment states.
+    //
+    // Do not treat them as failed payments.
     console.error(
       "Recovered webhook verification error:",
       error.message

@@ -42,7 +42,7 @@ function AdminDashboard() {
     const checkSession = async () => {
       try {
         const response = await fetch(
-          "http://localhost:5000/api/admin/dashboard",
+          "/api/admin/dashboard",
           {
             credentials: "include",
             signal: controller.signal,
@@ -90,7 +90,7 @@ function AdminDashboard() {
     if (!admin || (period === "custom" && (!from || !to))) return;
     const controller = new AbortController();
     setStatsLoading(true);
-    fetch(`http://localhost:5000/api/admin/dashboard/stats?${queryString}`, {
+    fetch(`/api/admin/dashboard/stats?${queryString}`, {
       credentials: "include", signal: controller.signal,
     }).then(async (r) => {
       if (!r.ok) throw new Error((await r.json().catch(() => ({}))).message || "Unable to load statistics");
@@ -104,7 +104,7 @@ function AdminDashboard() {
   const exportReport = async (format) => {
     setExporting(true); setError("");
     try {
-      const r = await fetch(`http://localhost:5000/api/admin/dashboard/export/${format}?${queryString}`, { credentials: "include" });
+      const r = await fetch(`/api/admin/dashboard/export/${format}?${queryString}`, { credentials: "include" });
       if (!r.ok) throw new Error((await r.json().catch(() => ({}))).message || "Export failed");
       const blob = await r.blob();
       const url = URL.createObjectURL(blob);
@@ -122,7 +122,7 @@ function AdminDashboard() {
 
     try {
       const response = await fetch(
-        "http://localhost:5000/api/admin/logout",
+        "/api/admin/logout",
         {
           method: "POST",
           credentials: "include",

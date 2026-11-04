@@ -5,12 +5,25 @@ const {
   verifyRazorpaySignature,
 } = require("../utils/razorpaySignature");
 
-// Verify Razorpay payment without modifying MongoDB.
+// ==========================================
+// RAZORPAY PAYMENT VERIFICATION
+// ==========================================
+
+// Verify a captured Razorpay payment
+// without modifying MongoDB.
+//
+// Supports:
+// 1. Razorpay-only payments
+// 2. Wallet + Razorpay split payments
+//
+// Wallet-only payments must not use
+// this function.
 //
 // IMPORTANT:
-// This function verifies a customer checkout callback.
-// Webhook-based verification requires a separate
-// webhook signature verification process.
+// This verifies a customer checkout callback.
+// Webhook verification requires a separate
+// Razorpay webhook signature verification flow.
+
 const verifyCapturedPayment = async ({
   razorpayOrderId,
   razorpayPaymentId,
@@ -44,15 +57,26 @@ const verifyCapturedPayment = async ({
     };
   }
 
-  // 4. Validate expected amount
+  // 4. Validate expected Razorpay amount
+  //
+  // Razorpay-only:
+  //   Full order amount.
+  //
+  // Wallet + Razorpay:
+  //   Remaining Razorpay contribution only.
+  //
+  // The caller must obtain this amount
+  // from trusted backend order records.
   if (
     !Number.isSafeInteger(expectedAmountInPaise) ||
     expectedAmountInPaise < 100
   ) {
-    throw new Error("Invalid expected payment amount");
+    throw new Error(
+      "Invalid expected Razorpay payment amount"
+    );
   }
 
-  // 5. Verify Razorpay checkout signature
+  // 5. Verify checkout signature
   const signatureValid = verifyRazorpaySignature({
     razorpayOrderId,
     razorpayPaymentId,
@@ -68,9 +92,12 @@ const verifyCapturedPayment = async ({
 
   // 6. Fetch payment directly from Razorpay
   //
-  // Network or Razorpay API errors are allowed
-  // to propagate. Do not treat an unavailable
-  // provider response as a failed payment.
+  // Do not trust payment status or amount
+  // sent by the frontend.
+  //
+  // Network/API errors must propagate,
+  // because an unavailable provider response
+  // does not mean the payment failed.
   const payment =
     await paymentServices.fetchRazorpayPayment(
       razorpayPaymentId
@@ -98,14 +125,16 @@ const verifyCapturedPayment = async ({
     };
   }
 
-  // 9. Verify amount and currency
+  // 9. Verify exact amount and currency
   if (
+    !Number.isSafeInteger(payment.amount) ||
     payment.amount !== expectedAmountInPaise ||
     payment.currency !== "INR"
   ) {
     return {
       verified: false,
-      reason: "Razorpay payment amount or currency mismatch",
+      reason:
+        "Razorpay payment amount or currency mismatch",
     };
   }
 
@@ -117,12 +146,13 @@ const verifyCapturedPayment = async ({
     return {
       verified: false,
       reason: "Payment is not confirmed as captured",
-      paymentStatus: payment.status || "unknown",
+      paymentStatus:
+        payment.status || "unknown",
       requiresReconciliation: true,
     };
   }
 
-  // 11. Payment verification successful
+  // 11. Verification successful
   return {
     verified: true,
     razorpayOrderId,

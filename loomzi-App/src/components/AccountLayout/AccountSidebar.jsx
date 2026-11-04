@@ -1,3 +1,4 @@
+import { alertDialog } from "../Dialog/dialogService.js";
 
 import { NavLink, useNavigate } from "react-router-dom";
 import {
@@ -5,6 +6,7 @@ import {
   FaMapMarkerAlt,
   FaBox,
   FaHeart,
+  FaWallet,
   FaSignOutAlt,
 } from "react-icons/fa";
 
@@ -14,7 +16,7 @@ function AccountSidebar({ user }) {
   const handleLogout = async () => {
     try {
       const response = await fetch(
-        "http://localhost:5000/api/auth/logout",
+        "/api/auth/logout",
         {
           method: "POST",
           credentials: "include",
@@ -31,7 +33,7 @@ function AccountSidebar({ user }) {
 
       navigate("/login", { replace: true });
     } catch (error) {
-      alert(error.message);
+      alertDialog(error.message);
     }
   };
 
@@ -50,6 +52,11 @@ function AccountSidebar({ user }) {
       label: "My Orders",
       path: "/my-orders",
       icon: <FaBox />,
+    },
+    {
+      label: "My Wallet",
+      path: "/wallet",
+      icon: <FaWallet />,
     },
     {
       label: "My Wishlist",

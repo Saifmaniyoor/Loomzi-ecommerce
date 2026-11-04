@@ -20,14 +20,140 @@ const {
   validateWebhookPaymentMatch,
 } = require("../utils/validateWebhookPaymentMatch");
 
+const {
+  settlePurchaseReservation,
+} = require("./walletLedgerService");
+
+// ==========================================
+// PAYMENT AMOUNT VALIDATION
+// ==========================================
+
+const getExpectedRazorpayAmount = (order) => {
+  const totalPaise = Math.round(
+    order.totalAmount * 100
+  );
+
+  if (
+    !Number.isSafeInteger(totalPaise) ||
+    totalPaise < 100
+  ) {
+    throw new Error("Invalid Loomzi order amount");
+  }
+
+  // Legacy Razorpay orders can have
+  // no payment breakdown.
+  if (order.paymentMethod === "Razorpay") {
+    if (order.paymentBreakdown) {
+      const breakdown = order.paymentBreakdown;
+
+      if (
+        breakdown.totalPaise !== totalPaise ||
+        breakdown.walletPaise !== 0 ||
+        breakdown.razorpayPaise !== totalPaise
+      ) {
+        throw new Error(
+          "Razorpay payment breakdown mismatch"
+        );
+      }
+    }
+
+    return totalPaise;
+  }
+
+  if (order.paymentMethod === "Wallet+Razorpay") {
+    const breakdown = order.paymentBreakdown;
+
+    if (!breakdown) {
+      throw new Error(
+        "Split payment breakdown is missing"
+      );
+    }
+
+    if (
+      !Number.isSafeInteger(breakdown.totalPaise) ||
+      !Number.isSafeInteger(breakdown.walletPaise) ||
+      !Number.isSafeInteger(breakdown.razorpayPaise) ||
+      breakdown.totalPaise !== totalPaise ||
+      breakdown.walletPaise <= 0 ||
+      breakdown.razorpayPaise < 100 ||
+      breakdown.walletPaise +
+        breakdown.razorpayPaise !== totalPaise ||
+      !["Reserved", "Settled"].includes(
+        breakdown.walletStatus
+      )
+    ) {
+      throw new Error(
+        "Invalid split payment breakdown"
+      );
+    }
+
+    return breakdown.razorpayPaise;
+  }
+
+  throw new Error(
+    "This order does not require Razorpay confirmation"
+  );
+};
+
+// ==========================================
+// CHECK ATTEMPT PAYMENT BREAKDOWN
+// ==========================================
+
+const validateAttemptBreakdown = (
+  attempt,
+  order,
+  expectedAmountInPaise
+) => {
+  if (
+    attempt.paymentMethod !== order.paymentMethod ||
+    attempt.amountInPaise !== expectedAmountInPaise ||
+    attempt.currency !== "INR"
+  ) {
+    throw new Error(
+      "Checkout attempt payment mismatch"
+    );
+  }
+
+  // Support existing Razorpay-only attempts
+  // that do not have paymentBreakdown.
+  if (
+    order.paymentMethod === "Razorpay" &&
+    !attempt.paymentBreakdown
+  ) {
+    return;
+  }
+
+  const a = attempt.paymentBreakdown;
+  const o = order.paymentBreakdown;
+
+  if (
+    !a ||
+    !o ||
+    a.totalPaise !== o.totalPaise ||
+    a.walletPaise !== o.walletPaise ||
+    a.razorpayPaise !== o.razorpayPaise
+  ) {
+    throw new Error(
+      "Checkout payment breakdown mismatch"
+    );
+  }
+};
+
+// ==========================================
+// CONFIRM CAPTURED PAYMENT
+// ==========================================
+
 // IMPORTANT:
+// The caller MUST verify the captured payment
+// directly with Razorpay before calling this.
+//
 // This function only updates MongoDB.
 //
-// The caller MUST first verify that the payment
-// is captured directly with Razorpay.
+// Webhook callers must independently verify
+// the webhook signature and fetch/verify
+// the captured payment with Razorpay.
 //
-// For webhook recovery, pass webhookContext.
-// For normal user confirmation, omit it.
+// Do not use for wallet-only payments.
 
 const confirmCapturedPaymentTransaction = async ({
   userId,
@@ -36,10 +162,7 @@ const confirmCapturedPaymentTransaction = async ({
   razorpayPaymentId,
   webhookContext = null,
 }) => {
-  // ==========================================
-  // 1. VALIDATE INPUTS
-  // ==========================================
-
+  // 1. Validate identifiers
   if (
     !mongoose.isValidObjectId(userId) ||
     !mongoose.isValidObjectId(orderId) ||
@@ -53,6 +176,7 @@ const confirmCapturedPaymentTransaction = async ({
     );
   }
 
+  // 2. Validate webhook ownership details
   if (
     webhookContext !== null &&
     (
@@ -75,14 +199,14 @@ const confirmCapturedPaymentTransaction = async ({
     let result;
 
     await session.withTransaction(async () => {
-      // ==========================================
-      // 2. FIND MATCHING LOOMZI ORDER
-      // ==========================================
-
+      // 3. Find matching Loomzi order
       const order = await Order.findOne({
         _id: orderId,
         user: userId,
         razorpayOrderId,
+        paymentMethod: {
+          $in: ["Razorpay", "Wallet+Razorpay"],
+        },
       }).session(session);
 
       if (!order) {
@@ -91,27 +215,14 @@ const confirmCapturedPaymentTransaction = async ({
         );
       }
 
-      // ==========================================
-      // 3. VALIDATE ORDER AMOUNT
-      // ==========================================
+      // 4. Determine Razorpay contribution
+      const expectedAmountInPaise =
+        getExpectedRazorpayAmount(order);
 
-      const expectedAmountInPaise = Math.round(
-        order.totalAmount * 100
-      );
+      const isSplitPayment =
+        order.paymentMethod === "Wallet+Razorpay";
 
-      if (
-        !Number.isSafeInteger(expectedAmountInPaise) ||
-        expectedAmountInPaise < 100
-      ) {
-        throw new Error(
-          "Invalid Loomzi order amount"
-        );
-      }
-
-      // ==========================================
-      // 4. VALIDATE AND CLAIM WEBHOOK EVENT
-      // ==========================================
-
+      // 5. Validate and claim webhook event
       if (webhookContext) {
         const normalizedEventId =
           webhookContext.eventId.trim();
@@ -119,8 +230,6 @@ const confirmCapturedPaymentTransaction = async ({
         const normalizedToken =
           webhookContext.processingToken.trim();
 
-        // Find only the webhook owned by
-        // this recovery worker.
         const webhookEvent =
           await WebhookEvent.findOne({
             eventId: normalizedEventId,
@@ -135,14 +244,16 @@ const confirmCapturedPaymentTransaction = async ({
           );
         }
 
-        // Verify that the stored webhook
-        // describes this exact payment.
+        // IMPORTANT:
+        // For split payments this is only
+        // the Razorpay contribution.
         const paymentMatch =
           validateWebhookPaymentMatch({
             event: webhookEvent,
             razorpayOrderId,
             razorpayPaymentId,
-            amountInPaise: expectedAmountInPaise,
+            amountInPaise:
+              expectedAmountInPaise,
           });
 
         if (!paymentMatch.valid) {
@@ -151,9 +262,6 @@ const confirmCapturedPaymentTransaction = async ({
           );
         }
 
-        // Conditional WRITE within the
-        // transaction prevents stale workers
-        // from committing payment confirmation.
         const updatedWebhook =
           await WebhookEvent.findOneAndUpdate(
             {
@@ -185,10 +293,7 @@ const confirmCapturedPaymentTransaction = async ({
         }
       }
 
-      // ==========================================
-      // 5. HANDLE DUPLICATE CONFIRMATION
-      // ==========================================
-
+      // 6. Handle duplicate confirmation
       if (order.paymentStatus === "Paid") {
         if (
           order.razorpayPaymentId !== razorpayPaymentId
@@ -198,12 +303,19 @@ const confirmCapturedPaymentTransaction = async ({
           );
         }
 
-        // If this was a webhook confirmation,
-        // the event has also been marked
-        // Processed in this transaction.
+        if (
+          isSplitPayment &&
+          order.paymentBreakdown.walletStatus !==
+            "Settled"
+        ) {
+          throw new Error(
+            "Paid split order requires wallet reconciliation"
+          );
+        }
 
         result = {
           orderId: order._id,
+          paymentMethod: order.paymentMethod,
           paymentStatus: "Paid",
           orderStatus: order.orderStatus,
           razorpayPaymentId,
@@ -213,10 +325,7 @@ const confirmCapturedPaymentTransaction = async ({
         return;
       }
 
-      // ==========================================
-      // 6. VERIFY ORDER IS PENDING
-      // ==========================================
-
+      // 7. Verify pending order
       if (
         order.paymentStatus !== "Pending" ||
         order.orderStatus !== "Pending" ||
@@ -227,15 +336,23 @@ const confirmCapturedPaymentTransaction = async ({
         );
       }
 
-      // ==========================================
-      // 7. VERIFY CHECKOUT ATTEMPT
-      // ==========================================
+      if (
+        isSplitPayment &&
+        order.paymentBreakdown.walletStatus !==
+          "Reserved"
+      ) {
+        throw new Error(
+          "Wallet reservation is not available for settlement"
+        );
+      }
 
+      // 8. Verify checkout attempt
       const attempt =
         await CheckoutAttempt.findOne({
           user: userId,
           order: orderId,
           razorpayOrderId,
+          paymentMethod: order.paymentMethod,
           status: "Ready",
           amountInPaise: expectedAmountInPaise,
           currency: "INR",
@@ -247,10 +364,13 @@ const confirmCapturedPaymentTransaction = async ({
         );
       }
 
-      // ==========================================
-      // 8. VERIFY STOCK RESERVATION
-      // ==========================================
+      validateAttemptBreakdown(
+        attempt,
+        order,
+        expectedAmountInPaise
+      );
 
+      // 9. Verify active stock reservation
       const reservation =
         await StockReservation.findOne({
           order: orderId,
@@ -264,31 +384,57 @@ const confirmCapturedPaymentTransaction = async ({
         );
       }
 
-      // An expired reservation may still be
-      // Active while payment is being confirmed.
-      // Do not release it solely because
-      // its expiry timestamp has passed.
+      // Do not reject a captured payment
+      // solely because expiresAt has passed.
+      // Reconcile captured payments before
+      // releasing reservations.
 
-      // ==========================================
-      // 9. MARK ORDER AS PAID
-      // ==========================================
+      // 10. Settle reserved wallet contribution
+      if (isSplitPayment) {
+        // This creates the settlement ledger
+        // entry but does NOT subtract the
+        // wallet balance a second time.
+        await settlePurchaseReservation({
+          userId,
+          orderId,
+          session,
+        });
+      }
+
+      // 11. Mark order as paid
+      const orderUpdate = {
+        paymentStatus: "Paid",
+        razorpayPaymentId,
+        orderStatus: "Confirmed",
+      };
+
+      if (isSplitPayment) {
+        orderUpdate[
+          "paymentBreakdown.walletStatus"
+        ] = "Settled";
+      }
+
+      const orderFilter = {
+        _id: orderId,
+        user: userId,
+        paymentMethod: order.paymentMethod,
+        paymentStatus: "Pending",
+        orderStatus: "Pending",
+        razorpayOrderId,
+        razorpayPaymentId: null,
+      };
+
+      if (isSplitPayment) {
+        orderFilter[
+          "paymentBreakdown.walletStatus"
+        ] = "Reserved";
+      }
 
       const updatedOrder =
         await Order.findOneAndUpdate(
+          orderFilter,
           {
-            _id: orderId,
-            user: userId,
-            paymentStatus: "Pending",
-            orderStatus: "Pending",
-            razorpayOrderId,
-            razorpayPaymentId: null,
-          },
-          {
-            $set: {
-              paymentStatus: "Paid",
-              razorpayPaymentId,
-              orderStatus: "Confirmed",
-            },
+            $set: orderUpdate,
           },
           {
             returnDocument: "after",
@@ -303,10 +449,7 @@ const confirmCapturedPaymentTransaction = async ({
         );
       }
 
-      // ==========================================
-      // 10. COMPLETE STOCK RESERVATION
-      // ==========================================
-
+      // 12. Complete stock reservation
       const updatedReservation =
         await StockReservation.findOneAndUpdate(
           {
@@ -334,19 +477,18 @@ const confirmCapturedPaymentTransaction = async ({
         );
       }
 
-      // ==========================================
-      // 11. COMPLETE CHECKOUT ATTEMPT
-      // ==========================================
-
+      // 13. Complete checkout attempt
       const updatedAttempt =
         await CheckoutAttempt.findOneAndUpdate(
           {
             _id: attempt._id,
             user: userId,
             order: orderId,
+            paymentMethod: order.paymentMethod,
             razorpayOrderId,
             status: "Ready",
-            amountInPaise: expectedAmountInPaise,
+            amountInPaise:
+              expectedAmountInPaise,
             currency: "INR",
           },
           {
@@ -368,49 +510,83 @@ const confirmCapturedPaymentTransaction = async ({
         );
       }
 
-      // ==========================================
-      // 12. REMOVE ONLY PURCHASED CART LINES
-      // ==========================================
-      // Order payment, stock completion and cart update commit together.
-      // Do not empty the whole cart: customer may have added new products.
-      const cart = await Cart.findOne({ user: userId }).session(session);
+      // 14. Remove only purchased cart lines.
+      // Preserve any newly added merchandise.
+      const cart = await Cart.findOne({
+        user: userId,
+      }).session(session);
+
       if (cart && cart.items.length) {
         const purchased = new Map(
           order.items.map((item) => [
-            `${String(item.product)}:${item.variantId ? String(item.variantId) : ""}`,
+            `${
+              String(item.product)
+            }:${
+              item.variantId
+                ? String(item.variantId)
+                : ""
+            }`,
             Number(item.quantity),
           ])
         );
 
-        // Remove only an exact matching line. If its quantity changed,
-        // leave it alone rather than deleting newly added merchandise.
-        const remainingItems = cart.items.filter((item) => {
-          const key = `${String(item.product)}:${item.variantId ? String(item.variantId) : ""}`;
-          return !purchased.has(key) || Number(item.quantity) !== purchased.get(key);
-        });
+        const remainingItems =
+          cart.items.filter((item) => {
+            const key = `${
+              String(item.product)
+            }:${
+              item.variantId
+                ? String(item.variantId)
+                : ""
+            }`;
 
-        if (remainingItems.length !== cart.items.length) {
-          const updatedCart = await Cart.updateOne(
-            { _id: cart._id, user: userId, __v: cart.__v },
-            {
-              $set: { items: remainingItems },
-              $inc: { __v: 1 },
-              $currentDate: { updatedAt: true },
-            },
-            { session }
-          );
-          if (updatedCart.matchedCount !== 1) {
-            throw new Error("Cart changed during payment confirmation; retry reconciliation");
+            return (
+              !purchased.has(key) ||
+              Number(item.quantity) !==
+                purchased.get(key)
+            );
+          });
+
+        if (
+          remainingItems.length !==
+          cart.items.length
+        ) {
+          const updatedCart =
+            await Cart.updateOne(
+              {
+                _id: cart._id,
+                user: userId,
+                __v: cart.__v,
+              },
+              {
+                $set: {
+                  items: remainingItems,
+                },
+                $inc: {
+                  __v: 1,
+                },
+                $currentDate: {
+                  updatedAt: true,
+                },
+              },
+              { session }
+            );
+
+          if (
+            updatedCart.matchedCount !== 1
+          ) {
+            throw new Error(
+              "Cart changed during payment confirmation; retry reconciliation"
+            );
           }
         }
       }
 
-      // ==========================================
-      // 13. RETURN CONFIRMATION RESULT
-      // ==========================================
-
+      // 15. Return confirmation
       result = {
         orderId: updatedOrder._id,
+        paymentMethod:
+          updatedOrder.paymentMethod,
         paymentStatus: "Paid",
         orderStatus: "Confirmed",
         razorpayPaymentId,
@@ -424,6 +600,367 @@ const confirmCapturedPaymentTransaction = async ({
   }
 };
 
+
+/**
+ * Confirm a wallet-only checkout.
+ *
+ * The pending order, wallet reservation,
+ * stock reservation, and checkout attempt
+ * must already exist.
+ *
+ * No Razorpay payment is required.
+ */
+const confirmWalletPaymentTransaction = async ({
+  userId,
+  orderId,
+}) => {
+  if (
+    !mongoose.isValidObjectId(userId) ||
+    !mongoose.isValidObjectId(orderId)
+  ) {
+    throw new Error(
+      "Invalid wallet confirmation identifiers"
+    );
+  }
+
+  const session = await mongoose.startSession();
+
+  try {
+    let result;
+
+    await session.withTransaction(async () => {
+      // 1. Find wallet-only order
+      const order = await Order.findOne({
+        _id: orderId,
+        user: userId,
+        paymentMethod: "Wallet",
+      }).session(session);
+
+      if (!order) {
+        throw new Error(
+          "Matching wallet order not found"
+        );
+      }
+
+      // 2. Validate payment breakdown
+      const totalPaise = Math.round(
+        order.totalAmount * 100
+      );
+
+      const breakdown = order.paymentBreakdown;
+
+      if (
+        !Number.isSafeInteger(totalPaise) ||
+        totalPaise < 100 ||
+        !breakdown ||
+        breakdown.totalPaise !== totalPaise ||
+        breakdown.walletPaise !== totalPaise ||
+        breakdown.razorpayPaise !== 0
+      ) {
+        throw new Error(
+          "Invalid wallet-only payment breakdown"
+        );
+      }
+
+      // Wallet-only orders must not have
+      // Razorpay payment identifiers.
+      if (
+        order.razorpayOrderId ||
+        order.razorpayPaymentId
+      ) {
+        throw new Error(
+          "Wallet-only order has Razorpay identifiers"
+        );
+      }
+
+      // 3. Handle duplicate confirmation
+      if (order.paymentStatus === "Paid") {
+        if (
+          breakdown.walletStatus !== "Settled" ||
+          order.orderStatus !== "Confirmed"
+        ) {
+          throw new Error(
+            "Paid wallet order requires reconciliation"
+          );
+        }
+
+        result = {
+          orderId: order._id,
+          paymentMethod: "Wallet",
+          paymentStatus: "Paid",
+          orderStatus: "Confirmed",
+          alreadyConfirmed: true,
+        };
+
+        return;
+      }
+
+      // 4. Verify pending order
+      if (
+        order.paymentStatus !== "Pending" ||
+        order.orderStatus !== "Pending" ||
+        breakdown.walletStatus !== "Reserved"
+      ) {
+        throw new Error(
+          "Wallet order requires reconciliation"
+        );
+      }
+
+      // 5. Verify checkout attempt
+      const attempt = await CheckoutAttempt.findOne({
+        user: userId,
+        order: orderId,
+        paymentMethod: "Wallet",
+        status: "Processing",
+        razorpayOrderId: null,
+        recoveryRazorpayOrderId: null,
+        amountInPaise: null,
+        currency: "INR",
+      }).session(session);
+
+      if (!attempt) {
+        throw new Error(
+          "Matching wallet checkout attempt not found"
+        );
+      }
+
+      const attemptBreakdown =
+        attempt.paymentBreakdown;
+
+      if (
+        !attemptBreakdown ||
+        attemptBreakdown.totalPaise !== totalPaise ||
+        attemptBreakdown.walletPaise !== totalPaise ||
+        attemptBreakdown.razorpayPaise !== 0
+      ) {
+        throw new Error(
+          "Wallet checkout attempt breakdown mismatch"
+        );
+      }
+
+      // 6. Verify active stock reservation
+      const reservation =
+        await StockReservation.findOne({
+          order: orderId,
+          user: userId,
+          status: "Active",
+        }).session(session);
+
+      if (!reservation) {
+        throw new Error(
+          "Active stock reservation not found"
+        );
+      }
+
+      // Wallet-only checkout should confirm
+      // promptly after reservation.
+      if (
+        !(reservation.expiresAt instanceof Date) ||
+        reservation.expiresAt.getTime() <= Date.now()
+      ) {
+        throw new Error(
+          "Wallet stock reservation expired; reconcile checkout"
+        );
+      }
+
+      // 7. Settle wallet reservation
+      //
+      // The wallet balance was already
+      // deducted during reservation.
+      //
+      // Settlement must NOT deduct it again.
+      await settlePurchaseReservation({
+        userId,
+        orderId,
+        session,
+      });
+
+      // 8. Mark order as Paid and Confirmed
+      const updatedOrder =
+        await Order.findOneAndUpdate(
+          {
+            _id: orderId,
+            user: userId,
+            paymentMethod: "Wallet",
+            paymentStatus: "Pending",
+            orderStatus: "Pending",
+            "paymentBreakdown.walletStatus":
+              "Reserved",
+            razorpayOrderId: null,
+            razorpayPaymentId: null,
+          },
+          {
+            $set: {
+              paymentStatus: "Paid",
+              orderStatus: "Confirmed",
+              "paymentBreakdown.walletStatus":
+                "Settled",
+            },
+          },
+          {
+            returnDocument: "after",
+            runValidators: true,
+            session,
+          }
+        );
+
+      if (!updatedOrder) {
+        throw new Error(
+          "Could not confirm wallet order"
+        );
+      }
+
+      // 9. Complete stock reservation
+      const updatedReservation =
+        await StockReservation.findOneAndUpdate(
+          {
+            _id: reservation._id,
+            order: orderId,
+            user: userId,
+            status: "Active",
+          },
+          {
+            $set: {
+              status: "Completed",
+              completedAt: new Date(),
+            },
+          },
+          {
+            returnDocument: "after",
+            runValidators: true,
+            session,
+          }
+        );
+
+      if (!updatedReservation) {
+        throw new Error(
+          "Could not complete stock reservation"
+        );
+      }
+
+      // 10. Complete checkout attempt
+      const updatedAttempt =
+        await CheckoutAttempt.findOneAndUpdate(
+          {
+            _id: attempt._id,
+            user: userId,
+            order: orderId,
+            paymentMethod: "Wallet",
+            status: "Processing",
+            amountInPaise: null,
+            currency: "INR",
+          },
+          {
+            $set: {
+              status: "Completed",
+              errorMessage: null,
+            },
+          },
+          {
+            returnDocument: "after",
+            runValidators: true,
+            session,
+          }
+        );
+
+      if (!updatedAttempt) {
+        throw new Error(
+          "Could not complete wallet checkout attempt"
+        );
+      }
+
+      // 11. Remove purchased cart items
+      const cart = await Cart.findOne({
+        user: userId,
+      }).session(session);
+
+      if (cart && cart.items.length) {
+        const purchased = new Map(
+          order.items.map((item) => [
+            `${
+              String(item.product)
+            }:${
+              item.variantId
+                ? String(item.variantId)
+                : ""
+            }`,
+            Number(item.quantity),
+          ])
+        );
+
+        const remainingItems =
+          cart.items.filter((item) => {
+            const key = `${
+              String(item.product)
+            }:${
+              item.variantId
+                ? String(item.variantId)
+                : ""
+            }`;
+
+            return (
+              !purchased.has(key) ||
+              Number(item.quantity) !==
+                purchased.get(key)
+            );
+          });
+
+        if (
+          remainingItems.length !==
+          cart.items.length
+        ) {
+          const updatedCart =
+            await Cart.updateOne(
+              {
+                _id: cart._id,
+                user: userId,
+                __v: cart.__v,
+              },
+              {
+                $set: {
+                  items: remainingItems,
+                },
+                $inc: {
+                  __v: 1,
+                },
+                $currentDate: {
+                  updatedAt: true,
+                },
+              },
+              {
+                session,
+              }
+            );
+
+          if (
+            updatedCart.matchedCount !== 1
+          ) {
+            throw new Error(
+              "Cart changed during wallet confirmation; retry reconciliation"
+            );
+          }
+        }
+      }
+
+      // 12. Return confirmation result
+      result = {
+        orderId: updatedOrder._id,
+        paymentMethod: "Wallet",
+        paymentStatus: "Paid",
+        orderStatus: "Confirmed",
+        alreadyConfirmed: false,
+      };
+    });
+
+    return result;
+  } finally {
+    await session.endSession();
+  }
+};
+
+
+
 module.exports = {
   confirmCapturedPaymentTransaction,
+  confirmWalletPaymentTransaction,
 };

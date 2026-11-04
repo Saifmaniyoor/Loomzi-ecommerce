@@ -35,12 +35,17 @@ const validateCouponForCheckout = async ({
     throw new Error("Invalid coupon details");
   }
 
-  // A conditional write coordinates with admin
-  // updates to the same coupon document.
+  // Conditional write coordinates with admin updates
+  // to the same coupon document.
   const coupon = await Coupon.findOneAndUpdate(
     {
       code: couponCode.trim().toUpperCase(),
       isActive: true,
+
+      // NEW: Reject archived coupons.
+      // Also supports older coupons without this field.
+      isArchived: { $ne: true },
+
       expiresAt: { $gt: new Date() },
     },
     {
@@ -49,7 +54,7 @@ const validateCouponForCheckout = async ({
       },
     },
     {
-      new: true,
+      returnDocument: "after",
       session,
     }
   );
