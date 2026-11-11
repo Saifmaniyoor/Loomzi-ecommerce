@@ -1,62 +1,24 @@
+
 const mongoose = require("mongoose");
 
-const checkoutAttemptServices = require("./checkoutAttemptServices");
+const checkoutAttemptServices = require(
+  "./checkoutAttemptServices"
+);
 const orderServices = require("./orderServices");
-const stockReservationServices = require("./stockReservationServices");
+const stockReservationServices = require(
+  "./stockReservationServices"
+);
 const paymentServices = require("./paymentServices");
-
 const {
   inspectRazorpayPaymentActivity,
 } = require("./paymentActivityServices");
 
-// Read-only recovery inspection.
-// This function does NOT authorize resuming payment, retrying payment,
-// releasing stock, releasing wallet reservations, or cancelling an order.
-// Any such action requires its own fresh provider verification and safeguards.
-
-const getExpectedRazorpayAmount = (order) => {
-  const totalPaise = Math.round(order.totalAmount * 100);
-  const breakdown = order.paymentBreakdown;
-
-  if (!Number.isSafeInteger(totalPaise) || totalPaise < 100) {
-    throw new Error("Invalid Loomzi order total");
-  }
-
-  if (order.paymentMethod === "Razorpay") {
-    if (
-      breakdown &&
-      (breakdown.totalPaise !== totalPaise ||
-        breakdown.walletPaise !== 0 ||
-        breakdown.razorpayPaise !== totalPaise ||
-        (breakdown.walletStatus != null &&
-          breakdown.walletStatus !== "Not Used"))
-    ) {
-      throw new Error("Invalid Razorpay-only payment allocation");
-    }
-    return totalPaise;
-  }
-
-  if (order.paymentMethod === "Wallet+Razorpay") {
-    if (
-      !breakdown ||
-      !Number.isSafeInteger(breakdown.totalPaise) ||
-      !Number.isSafeInteger(breakdown.walletPaise) ||
-      !Number.isSafeInteger(breakdown.razorpayPaise) ||
-      breakdown.totalPaise !== totalPaise ||
-      breakdown.walletPaise <= 0 ||
-      breakdown.razorpayPaise < 100 ||
-      breakdown.walletPaise + breakdown.razorpayPaise !== totalPaise ||
-      !["Reserved", "Settled"].includes(breakdown.walletStatus)
-    ) {
-      throw new Error("Invalid Wallet + Razorpay payment allocation");
-    }
-    return breakdown.razorpayPaise;
-  }
-
-  throw new Error("Order does not require Razorpay");
-};
-
-const inspectPaymentRecovery = async ({ attemptId, userId, orderId }) => {
+// Read-only inspection. This does not authorize a payment retry.
+const inspectPaymentRecovery = async ({
+  attemptId,
+  userId,
+  orderId,
+}) => {
   if (
     !mongoose.isValidObjectId(attemptId) ||
     !mongoose.isValidObjectId(userId) ||
@@ -73,7 +35,8 @@ const inspectPaymentRecovery = async ({ attemptId, userId, orderId }) => {
     ...extra,
   });
 
-  const attempt = await checkoutAttemptServices.findAttemptById(attemptId);
+  const attempt =
+    await checkoutAttemptServices.findAttemptById(attemptId);
 
   if (
     !attempt ||
@@ -83,53 +46,45 @@ const inspectPaymentRecovery = async ({ attemptId, userId, orderId }) => {
     throw new Error("Checkout attempt not found");
   }
 
-  const order = await orderServices.findOrderByIdAndUser({ orderId, userId });
+  const order = await orderServices.findOrderByIdAndUser({
+    orderId,
+    userId,
+  });
+
   if (!order) {
     throw new Error("Loomzi order not found");
   }
 
-  let expectedAmountInPaise;
-  try {
-    expectedAmountInPaise = getExpectedRazorpayAmount(order);
-  } catch (error) {
-    return reconciliationRequired(error.message);
-  }
+  const totalPaise = Math.round(order.totalAmount * 100);
+  const expectedAmountInPaise =
+    order.paymentMethod === "Wallet+Razorpay"
+      ? order.paymentBreakdown?.razorpayPaise
+      : totalPaise;
 
   if (
-    attempt.paymentMethod !== order.paymentMethod ||
+    !Number.isSafeInteger(expectedAmountInPaise) ||
+    expectedAmountInPaise < 100 ||
     attempt.amountInPaise !== expectedAmountInPaise ||
     attempt.currency !== "INR"
   ) {
     return reconciliationRequired(
-      "Checkout payment method, amount or currency does not match the Loomzi order"
+      "Checkout amount or currency does not match the Loomzi order"
     );
   }
 
-  // Validate the attempt's allocation, when present.
-  // Legacy Razorpay-only attempts may have no breakdown.
-  const attemptBreakdown = attempt.paymentBreakdown;
-  const orderBreakdown = order.paymentBreakdown;
-  if (order.paymentMethod === "Wallet+Razorpay" && !attemptBreakdown) {
-    return reconciliationRequired("Split payment attempt breakdown is missing");
-  }
-  if (attemptBreakdown) {
-    if (
-      !orderBreakdown ||
-      attemptBreakdown.totalPaise !== orderBreakdown.totalPaise ||
-      attemptBreakdown.walletPaise !== orderBreakdown.walletPaise ||
-      attemptBreakdown.razorpayPaise !== orderBreakdown.razorpayPaise
-    ) {
-      return reconciliationRequired("Checkout attempt payment breakdown mismatch");
-    }
-  }
+  const reservation =
+    await stockReservationServices.findReservationByOrderId(
+      orderId
+    );
 
-  const reservation = await stockReservationServices.findReservationByOrderId(orderId);
   if (
     !reservation ||
     String(reservation.user) !== String(userId) ||
     String(reservation.order) !== String(orderId)
   ) {
-    return reconciliationRequired("Matching stock reservation not found");
+    return reconciliationRequired(
+      "Matching stock reservation not found"
+    );
   }
 
   const knownIds = [
@@ -139,10 +94,13 @@ const inspectPaymentRecovery = async ({ attemptId, userId, orderId }) => {
   ].filter(Boolean);
 
   if (new Set(knownIds).size > 1) {
-    return reconciliationRequired("Conflicting Razorpay order IDs were found");
+    return reconciliationRequired(
+      "Conflicting Razorpay order IDs were found"
+    );
   }
 
   const razorpayOrderId = knownIds[0];
+
   if (!razorpayOrderId) {
     return reconciliationRequired(
       "Razorpay order ID is unknown. Provider reconciliation is required."
@@ -153,21 +111,36 @@ const inspectPaymentRecovery = async ({ attemptId, userId, orderId }) => {
     typeof razorpayOrderId !== "string" ||
     !/^order_[a-zA-Z0-9]+$/.test(razorpayOrderId)
   ) {
-    return reconciliationRequired("Invalid stored Razorpay order ID");
+    return reconciliationRequired(
+      "Invalid stored Razorpay order ID"
+    );
   }
 
   let razorpayOrder;
+
   try {
-    razorpayOrder = await paymentServices.fetchRazorpayOrder(razorpayOrderId);
+    razorpayOrder =
+      await paymentServices.fetchRazorpayOrder(
+        razorpayOrderId
+      );
   } catch (error) {
-    console.error("Razorpay order recovery lookup failed:", error.message);
+    console.error(
+      "Razorpay order recovery lookup failed:",
+      error.message
+    );
+
     return reconciliationRequired(
       "Razorpay order could not be verified. Retry reconciliation later."
     );
   }
 
-  if (!razorpayOrder || razorpayOrder.id !== razorpayOrderId) {
-    return reconciliationRequired("Unexpected Razorpay order response");
+  if (
+    !razorpayOrder ||
+    razorpayOrder.id !== razorpayOrderId
+  ) {
+    return reconciliationRequired(
+      "Unexpected Razorpay order response"
+    );
   }
 
   if (
@@ -175,19 +148,25 @@ const inspectPaymentRecovery = async ({ attemptId, userId, orderId }) => {
     razorpayOrder.currency !== "INR" ||
     razorpayOrder.receipt !== String(orderId)
   ) {
-    return reconciliationRequired("Razorpay order details do not match Loomzi");
+    return reconciliationRequired(
+      "Razorpay order details do not match Loomzi"
+    );
   }
 
-  // Inspect provider activity before evaluating local reservation expiry.
-  // A captured payment must not be ignored due to an expired reservation.
   let paymentActivity;
+
   try {
-    paymentActivity = await inspectRazorpayPaymentActivity({
-      razorpayOrderId,
-      amountInPaise: expectedAmountInPaise,
-    });
+    paymentActivity =
+      await inspectRazorpayPaymentActivity({
+        razorpayOrderId,
+        amountInPaise: expectedAmountInPaise,
+      });
   } catch (error) {
-    console.error("Razorpay payment activity lookup failed:", error.message);
+    console.error(
+      "Razorpay payment activity lookup failed:",
+      error.message
+    );
+
     return reconciliationRequired(
       "Payment activity could not be verified. Reconciliation required."
     );
@@ -202,40 +181,80 @@ const inspectPaymentRecovery = async ({ attemptId, userId, orderId }) => {
       paymentActivity?.reason ||
         "Razorpay payment activity requires reconciliation",
       {
-        paymentCount: paymentActivity?.paymentCount ?? null,
-        paymentStatus: paymentActivity?.paymentStatus ?? null,
+        paymentCount:
+          paymentActivity?.paymentCount ?? null,
+        paymentStatus:
+          paymentActivity?.paymentStatus ?? null,
       }
     );
   }
 
-  if (order.paymentStatus !== "Pending" || order.orderStatus !== "Pending") {
-    return reconciliationRequired("Loomzi order is no longer pending", {
-      paymentCount: paymentActivity.paymentCount ?? null,
-    });
+  if (
+    order.paymentStatus !== "Pending" ||
+    order.orderStatus !== "Pending"
+  ) {
+    return reconciliationRequired(
+      "Loomzi order is no longer pending",
+      {
+        paymentCount:
+          paymentActivity.paymentCount ?? null,
+      }
+    );
   }
 
   if (reservation.status !== "Active") {
-    return reconciliationRequired("Stock reservation is no longer active", {
-      paymentCount: paymentActivity.paymentCount ?? null,
-    });
+    return reconciliationRequired(
+      "Stock reservation is no longer active",
+      {
+        paymentCount:
+          paymentActivity.paymentCount ?? null,
+      }
+    );
   }
 
   const expiresAt = new Date(reservation.expiresAt);
-  if (!Number.isFinite(expiresAt.getTime()) || expiresAt.getTime() <= Date.now()) {
-    return reconciliationRequired("Stock reservation has expired", {
-      paymentCount: paymentActivity.paymentCount ?? null,
-    });
+
+  if (
+    !Number.isFinite(expiresAt.getTime()) ||
+    expiresAt.getTime() <= Date.now()
+  ) {
+    return reconciliationRequired(
+      "Stock reservation has expired",
+      {
+        paymentCount:
+          paymentActivity.paymentCount ?? null,
+      }
+    );
   }
 
-  if (razorpayOrder.status !== "created") {
-    return reconciliationRequired("Razorpay order status requires reconciliation", {
-      razorpayOrderStatus: razorpayOrder.status ?? "unknown",
-      paymentCount: paymentActivity.paymentCount ?? null,
-    });
+  if (
+    razorpayOrder.status !== "created" &&
+    !(
+      razorpayOrder.status === "attempted" &&
+      paymentActivity.paymentStatus === "failed"
+    )
+  ) {
+    return reconciliationRequired(
+      "Razorpay order status requires reconciliation",
+      {
+        razorpayOrderStatus:
+          razorpayOrder.status ?? "unknown",
+        paymentCount:
+          paymentActivity.paymentCount ?? null,
+      }
+    );
   }
 
-  if (!["Creating Payment", "Ready", "Recovery Required"].includes(attempt.status)) {
-    return reconciliationRequired("Checkout attempt status requires reconciliation");
+  if (
+    ![
+      "Creating Payment",
+      "Ready",
+      "Recovery Required",
+    ].includes(attempt.status)
+  ) {
+    return reconciliationRequired(
+      "Checkout attempt status requires reconciliation"
+    );
   }
 
   return {
@@ -248,9 +267,16 @@ const inspectPaymentRecovery = async ({ attemptId, userId, orderId }) => {
     currency: "INR",
     reservationExpiresAt: reservation.expiresAt,
     paymentCount: paymentActivity.paymentCount,
+    paymentStatus:
+      paymentActivity.paymentStatus ??
+      (paymentActivity.paymentCount === 0
+        ? "none"
+        : "unknown"),
     message:
       "Razorpay order and local records were inspected. No payment resumption or retry is authorized.",
   };
 };
 
-module.exports = { inspectPaymentRecovery };
+module.exports = {
+  inspectPaymentRecovery,
+};

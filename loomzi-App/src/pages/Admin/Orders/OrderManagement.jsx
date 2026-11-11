@@ -12,6 +12,7 @@ const money = (value) => `₹${Number(value || 0).toLocaleString("en-IN")}`;
 export default function OrderManagement() {
   const [orders, setOrders] = useState([]);
   const [filter, setFilter] = useState("");
+  const [paymentGroup, setPaymentGroup] = useState("confirmed");
   const [page, setPage] = useState(1);
   const [pages, setPages] = useState(1);
   const [selected, setSelected] = useState(null);
@@ -24,10 +25,10 @@ export default function OrderManagement() {
   const [shipmentRecovered, setShipmentRecovered] = useState(false);
   const load = useCallback(async () => {
     try {
-      const data = await api(`?page=${page}&status=${encodeURIComponent(filter)}`);
+      const data = await api(`?page=${page}&status=${encodeURIComponent(filter)}&paymentGroup=${encodeURIComponent(paymentGroup)}`);
       setOrders(data.orders || []); setPages(data.pages || 1);
     } catch (e) { setError(e.message); }
-  }, [page, filter]);
+  }, [page, filter, paymentGroup]);
   useEffect(() => { load(); }, [load]);
   const open = async (id) => {
     setError("");
@@ -65,6 +66,20 @@ export default function OrderManagement() {
   return <main className="loomzi-order-admin">
     <h1>Order Management</h1><p>Update delivery progress and courier details. Customers can view these updates in My Orders.</p>
     {error && <p role="alert" className="oa-error">{error}</p>}{notice && <p role="status" className="oa-success">{notice}</p>}
+    <div className="oa-payment-tabs" role="group" aria-label="Filter orders by payment">
+      {[
+        ["confirmed", "Confirmed Orders"],
+        ["unpaid", "Unpaid Orders"],
+        ["history", "Payment History"],
+      ].map(([value, label]) => (
+        <button key={value} type="button"
+          className={paymentGroup === value ? "oa-payment-tab is-active" : "oa-payment-tab"}
+          aria-pressed={paymentGroup === value}
+          onClick={() => { setPaymentGroup(value); setPage(1); setSelected(null); setError(""); setNotice(""); }}>
+          {label}
+        </button>
+      ))}
+    </div>
     <label>Filter by status <select value={filter} onChange={(e) => { setFilter(e.target.value); setPage(1); }}><option value="">All orders</option>{statuses.map((s) => <option key={s}>{s}</option>)}</select></label>
     <div className="oa-table"><table><thead><tr><th>Order</th><th>Customer</th><th>Date</th><th>Total</th><th>Payment</th><th>Delivery</th><th>Action</th></tr></thead><tbody>
       {orders.map((o) => (
@@ -85,6 +100,7 @@ export default function OrderManagement() {
       <p><strong>Address:</strong> {[selected.shippingAddress?.addressLine1, selected.shippingAddress?.city, selected.shippingAddress?.state, selected.shippingAddress?.pincode].filter(Boolean).join(", ")}</p>
       <p><strong>Payment:</strong> {selected.paymentMethod} · {selected.paymentStatus} · {money(selected.totalAmount)}</p>
       <h3>Products</h3>{selected.items.map((item) => <p key={item._id}>{item.name} × {item.quantity} — {money(item.lineTotal)}</p>)}
+      {selected.paymentStatus !== "Paid" && <p className="oa-error" role="status">Payment is not confirmed. Delivery updates are disabled.</p>}
       <form className="oa-form" onSubmit={save}>
         <label>Delivery status<select value={form.status} onChange={(e) => set("status", e.target.value)}>{statuses.filter((s) => s !== "Cancelled").map((s) => <option key={s}>{s}</option>)}</select></label>
         <label>Courier<input value={form.courier} maxLength={100} onChange={(e) => set("courier", e.target.value)} placeholder="Courier company" /></label>
@@ -92,9 +108,9 @@ export default function OrderManagement() {
         <label>Tracking URL (HTTPS)<input type="url" value={form.trackingUrl} onChange={(e) => set("trackingUrl", e.target.value)} placeholder="https://..." /></label>
         <label>Estimated delivery<input type="date" value={form.estimatedDelivery} onChange={(e) => set("estimatedDelivery", e.target.value)} /></label>
         <label className="oa-wide">Delivery update note<textarea maxLength={500} value={form.note} onChange={(e) => set("note", e.target.value)} placeholder="Package dispatched from warehouse" /></label>
-        <button disabled={busy || selected.orderStatus === "Cancelled"} type="submit">{busy ? "Saving..." : "Save delivery update"}</button>
+        <button disabled={busy || selected.orderStatus === "Cancelled" || selected.paymentStatus !== "Paid"} type="submit">{busy ? "Saving..." : "Save delivery update"}</button>
       </form>
-      {canAdminCancel && <div className="oa-cancel-panel">
+      {canAdminCancel && selected.paymentStatus === "Paid" && <div className="oa-cancel-panel">
         <h3>Cancel order</h3>
         <p>Delivered orders must be handled through returns. For shipped orders, confirm courier interception or parcel recovery before cancelling.</p>
         <label>Cancellation reason<textarea value={cancelReason} maxLength={450} onChange={(e) => setCancelReason(e.target.value)} placeholder="Reason for admin cancellation" /></label>
@@ -108,7 +124,7 @@ export default function OrderManagement() {
           )}
         </Fragment>
       ))}
-      {!orders.length && <tr><td colSpan="7">No orders found</td></tr>}
+      {!orders.length && <tr><td colSpan="7">No orders found in this section</td></tr>}
     </tbody></table></div>
     <div className="oa-pagination"><button disabled={page <= 1} onClick={() => setPage(page - 1)}>Previous</button><span>Page {page} of {pages}</span><button disabled={page >= pages} onClick={() => setPage(page + 1)}>Next</button></div>
   </main>;

@@ -4,7 +4,7 @@ const User = require("../models/User");
 // Get profile by customer ID
 const findProfileById = async (userId) => {
   return await User.findById(userId).select(
-    "fullName email phone isVerified isBlocked"
+    "fullName email phone isVerified isBlocked googleId"
   );
 };
 

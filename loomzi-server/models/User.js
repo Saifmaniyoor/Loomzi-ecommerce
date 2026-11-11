@@ -18,17 +18,19 @@ const userSchema = new mongoose.Schema(
 
     phone: {
       type: String,
-      required: [true, "Phone number is required"],
+      required: function () { return !this.googleId; },
       unique: true,
       trim: true,
     },
 
     password: {
       type: String,
-      required: [true, "Password is required"],
+      required: function () { return !this.googleId; },
       minlength: 8,
       select: false,
     },
+
+    googleId: { type: String, unique: true, sparse: true, default: undefined },
 
     isVerified: {
       type: Boolean,
@@ -48,6 +50,12 @@ const userSchema = new mongoose.Schema(
     },
 
     otpResendAvailableAt: { type: Date, default: null },
+
+    pendingEmail: { type: String, default: null },
+    emailChangeOtpHash: { type: String, default: null, select: false },
+    emailChangeOtpExpires: { type: Date, default: null },
+    emailChangeResendAt: { type: Date, default: null },
+    emailChangeAttempts: { type: Number, default: 0 },
 
     resetOtp: {
       type: String,

@@ -1,7 +1,7 @@
 import { confirmDialog, showDialog } from "../../components/Dialog/dialogService.js";
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { getOrderById, cancelOrder } from "../../services/orderApi";
+import { getOrderById, cancelOrder, downloadOrderInvoice } from "../../services/orderApi";
 import "./OrderDetails.css";
 
 function OrderDetails() {
@@ -11,6 +11,8 @@ function OrderDetails() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [cancelling, setCancelling] = useState(false);
+  const [downloadingInvoice, setDownloadingInvoice] = useState(false);
+  const [invoiceError, setInvoiceError] = useState("");
   const [cancelError, setCancelError] = useState("");
   const [cancelSuccess, setCancelSuccess] = useState("");
 
@@ -45,6 +47,19 @@ function OrderDetails() {
       cancelled = true;
     };
   }, [orderId]);
+
+  const handleDownloadInvoice = async () => {
+    if (!order || downloadingInvoice) return;
+    setDownloadingInvoice(true);
+    setInvoiceError("");
+    try {
+      await downloadOrderInvoice(order.id);
+    } catch (error) {
+      setInvoiceError(error.message || "Could not download invoice");
+    } finally {
+      setDownloadingInvoice(false);
+    }
+  };
 
   const handleCancelOrder = async () => {
     if (!order || cancelling) return;
@@ -111,6 +126,13 @@ function OrderDetails() {
 
   const currentStatus = order.orderStatus;
   const canCancel = order.canCancel === true;
+  const invoiceEligibleStatuses = ["Shipped", "Out for Delivery", "Delivered"];
+  const canDownloadInvoice =
+    order.paymentStatus === "Paid" &&
+    invoiceEligibleStatuses.includes(order.orderStatus) &&
+    !(order.items || []).some((item) =>
+      ["Cancelled", "Returned", "Return Requested"].includes(item.status)
+    );
 
   const isCancelled =
     currentStatus?.toLowerCase() === "cancelled" ||
@@ -142,6 +164,30 @@ function OrderDetails() {
             <strong>Payment Status:</strong> {order.paymentStatus}
           </p>
 
+          {canDownloadInvoice && (
+            <div className="order-invoice-panel">
+              <div className="order-invoice-info">
+                <span className="order-invoice-icon" aria-hidden="true">📄</span>
+                <div>
+                  <strong className="order-invoice-title">Your sales invoice</strong>
+                  <span className="order-invoice-subtitle">Download a PDF copy for your records.</span>
+                </div>
+              </div>
+              <button
+                type="button"
+                className="order-invoice-button"
+                onClick={handleDownloadInvoice}
+                disabled={downloadingInvoice}
+                aria-busy={downloadingInvoice}
+              >
+                <svg aria-hidden="true" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 3v12m-5-5 5 5 5-5M4 17v3h16v-3" />
+                </svg>
+                {downloadingInvoice ? "Preparing PDF..." : "Download Invoice"}
+              </button>
+            </div>
+          )}
+          {invoiceError && <p className="order-cancel-error" role="alert">{invoiceError}</p>}
           <p className="order-cancellation-policy">
             Cancellation is available before shipment for eligible orders. Once shipped,
             standard cancellation is unavailable. See our{" "}

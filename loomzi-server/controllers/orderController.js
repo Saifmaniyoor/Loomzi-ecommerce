@@ -254,8 +254,98 @@ const cancelOrder = async (req, res) => {
 };
 
 
+// Download a sales invoice only for the authenticated customer's paid, active order.
+const downloadInvoice = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    if (!mongoose.isObjectIdOrHexString(orderId)) {
+      return res.status(400).json({ message: "Invalid order ID" });
+    }
+    const order = await Order.findOne({ _id: orderId, user: req.user._id }).lean();
+    if (!order) return res.status(404).json({ message: "Order not found" });
+    const invoiceEligibleStatuses = ["Shipped", "Out for Delivery", "Delivered"];
+    if (order.paymentStatus !== "Paid" ||
+        !invoiceEligibleStatuses.includes(order.orderStatus) ||
+        (order.items || []).some(item => ["Cancelled", "Returned", "Return Requested"].includes(item.status))) {
+      return res.status(409).json({ message: "Invoice unavailable for this order status" });
+    }
+
+    const PDFDocument = require("pdfkit");
+    const doc = new PDFDocument({ size: "A4", margin: 48 });
+    const money = value => `Rs. ${Number(value || 0).toFixed(2)}`;
+    const safe = value => String(value ?? "").replace(/[\r\n]+/g, " ");
+    const address = order.shippingAddress || {};
+    const date = new Date(order.createdAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric", timeZone: "Asia/Kolkata" });
+    const number = String(order._id);
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="Loomzi-Invoice-${number}.pdf"`);
+    doc.on("error", err => { console.error("Invoice PDF error:", err); res.destroy(err); });
+    doc.pipe(res);
+
+    doc.fontSize(23).font("Helvetica-Bold").text("LOOMZI");
+    doc.moveDown(0.3).fontSize(16).text("Sales Invoice");
+    doc.moveDown(0.6).font("Helvetica").fontSize(10);
+    doc.text(`Order reference: ${number}`);
+    doc.text(`Order date: ${date}`);
+    doc.text(`Payment: ${safe(order.paymentMethod)} (Paid)`);
+    doc.moveDown(0.7).font("Helvetica-Bold").text("Bill to / Ship to");
+    doc.font("Helvetica");
+    [address.fullName, address.addressLine1, address.addressLine2, address.landmark,
+      [address.city, address.state, address.pincode].filter(Boolean).join(", "),
+      address.phone ? `Phone: ${address.phone}` : ""]
+      .filter(Boolean).forEach(line => doc.text(safe(line)));
+    doc.moveDown(1);
+
+    const col = { item: 48, qty: 340, unit: 390, total: 490 };
+    const header = () => {
+      doc.font("Helvetica-Bold").fontSize(10);
+      doc.text("Product", col.item, doc.y, { width: 270 });
+      const y = doc.y - 12;
+      doc.text("Qty", col.qty, y, { width: 40, align: "right" });
+      doc.text("Unit", col.unit, y, { width: 85, align: "right" });
+      doc.text("Amount", col.total, y, { width: 72, align: "right" });
+      doc.moveDown(0.7).moveTo(48, doc.y).lineTo(562, doc.y).stroke();
+      doc.moveDown(0.4).font("Helvetica");
+    };
+    header();
+    for (const item of order.items || []) {
+      if (doc.y > 690) { doc.addPage(); header(); }
+      const y = doc.y;
+      const variant = [item.color, item.size].filter(Boolean).join(" / ");
+      const name = safe(item.name) + (variant ? ` (${safe(variant)})` : "");
+      doc.text(name, col.item, y, { width: 270 });
+      const endY = doc.y;
+      doc.text(String(item.quantity), col.qty, y, { width: 40, align: "right" });
+      doc.text(money(item.price), col.unit, y, { width: 85, align: "right" });
+      doc.text(money(item.lineTotal), col.total, y, { width: 72, align: "right" });
+      doc.y = Math.max(endY, y + 17) + 8;
+    }
+    if (doc.y > 635) doc.addPage();
+    doc.moveDown(0.7);
+    const totalRow = (label, amount, bold = false) => {
+      const y = doc.y;
+      doc.font(bold ? "Helvetica-Bold" : "Helvetica").text(label, 320, y, { width: 150 });
+      doc.text(money(amount), 472, y, { width: 90, align: "right" });
+      doc.y = y + 22;
+    };
+    totalRow("Subtotal", order.subtotal);
+    if (order.coupon?.discountAmount > 0) totalRow(`Coupon (${safe(order.coupon.code || "")})`, -order.coupon.discountAmount);
+    totalRow("Shipping", order.shippingCharge);
+    // No GST is charged or represented for this non-GST-registered seller.
+    totalRow("Total paid", order.totalAmount, true);
+    doc.moveDown(1).font("Helvetica").fontSize(9).fillColor("#555555")
+      .text("Sales invoice for the order shown above. No GST has been charged.");
+    doc.end();
+  } catch (error) {
+    console.error("Download invoice error:", error);
+    if (!res.headersSent) res.status(500).json({ message: "Unable to generate invoice" });
+    else res.destroy(error);
+  }
+};
+
 module.exports = {
   getMyOrders,
   getOrderById,
   cancelOrder,
+  downloadInvoice,
 };

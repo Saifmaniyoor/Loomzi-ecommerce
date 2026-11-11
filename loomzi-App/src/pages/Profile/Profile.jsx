@@ -13,6 +13,7 @@ import {
 } from "../../services/profileApi";
 
 import "./Profile.css";
+import EmailChange from "./EmailChange";
 import { FaEye, FaEyeSlash } from "react-icons/fa";
 
 function Profile() {
@@ -252,6 +253,8 @@ const togglePasswordVisibility = (field) => {
           </button>
         </form>
       </section>
+
+      <EmailChange currentEmail={profile.email} onChanged={(email) => {setProfile(p => ({...p,email}));window.dispatchEvent(new Event("loomzi:profile-updated"));}} />
 
       {/* Change Password */}
       <section className="profile-card">

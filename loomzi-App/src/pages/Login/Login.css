@@ -531,3 +531,6 @@
   }
 
 }
+
+/* Google sign-in section: match form width and spacing */
+.login-form + .loomzi-google-signin, .login-card .loomzi-google-signin { width: 100%; }

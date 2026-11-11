@@ -184,3 +184,7 @@
   outline: 2px solid #a05c39;
   border-radius: 4px;
 }
+
+.profile-email-hint {color:#766b65;font-size:14px;line-height:1.6;margin:0 0 20px;}
+.profile-email-actions {display:flex;flex-wrap:wrap;align-items:center;gap:12px;}
+.profile-secondary-button {border:1px solid #ded6d0;border-radius:7px;background:white;color:#4f413a;padding:13px 22px;font-weight:600;cursor:pointer;}

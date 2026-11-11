@@ -15,6 +15,10 @@ const {
   resetPassword,
 } = require("../controllers/authController");
 
+const { googleLogin, completeGoogleProfile } = require("../controllers/googleAuthController");
+router.post("/google", googleLogin);
+router.post("/google/complete-profile", completeGoogleProfile);
+
 // Register user
 router.post("/register", registerUser);
 

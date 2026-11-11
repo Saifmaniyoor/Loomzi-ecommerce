@@ -143,7 +143,19 @@ const inspectRazorpayPaymentActivity = async ({
     );
   }
 
-  // 9. Handle all other payment attempts
+  // 9. Failed payments are terminal at the provider at inspection time.
+  // This is still ONLY a snapshot, not permission to retry in production.
+  if (payments.length > 0 && payments.every((payment) => payment.status === "failed")) {
+    return {
+      safeToResume: false,
+      requiresReconciliation: false,
+      paymentCount: payments.length,
+      paymentStatus: "failed",
+      message: "Only failed payment attempts found; test-mode inspection only.",
+    };
+  }
+
+  // Any nonterminal or unknown status must be reconciled.
   if (payments.length > 0) {
     return reconciliationRequired(
       "Previous payment attempts require reconciliation",

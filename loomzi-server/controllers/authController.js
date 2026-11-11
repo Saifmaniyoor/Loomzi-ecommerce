@@ -362,6 +362,10 @@ const loginUser = async (req, res) => {
       });
     }
 
+    if (!user.password) {
+      return res.status(401).json({ message: "Please sign in with Google" });
+    }
+
     // 3. Compare password
     const isPasswordValid = await bcrypt.compare(
       password,

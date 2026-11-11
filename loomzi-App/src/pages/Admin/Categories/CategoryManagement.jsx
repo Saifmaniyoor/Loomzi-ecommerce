@@ -232,6 +232,7 @@ function CategoryManagement() {
               onChange={(e) => setCategoryName(e.target.value)}
               placeholder="Enter category name"
               required
+              
             />
 
             <label htmlFor="category-description">Description</label>

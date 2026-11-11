@@ -660,3 +660,7 @@
 
 }
 .register-password-hint{margin:6px 0 0 12px;font-size:12px;line-height:1.45;color:#766b70}
+
+
+/* Google sign-in section: match form width and spacing */
+.register-form + .loomzi-google-signin, .register-card .loomzi-google-signin { width: 100%; }

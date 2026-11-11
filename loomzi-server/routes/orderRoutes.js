@@ -6,6 +6,7 @@ const {
   getMyOrders,
   getOrderById,
   cancelOrder,
+  downloadInvoice,
 } = require("../controllers/orderController");
 
 const router = express.Router();
@@ -15,6 +16,9 @@ router.get("/", requireUser, getMyOrders);
 
 // Cancel an order
 router.patch("/:orderId/cancel", requireUser, cancelOrder);
+
+// Download paid-order invoice (must precede /:orderId)
+router.get("/:orderId/invoice", requireUser, downloadInvoice);
 
 // Get details of a specific order
 router.get("/:orderId", requireUser, getOrderById);

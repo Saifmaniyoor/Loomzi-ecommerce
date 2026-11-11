@@ -1,0 +1,45 @@
+/* Shared Google Sign-In styling: used on Login and Registration */
+.loomzi-google-signin {
+  width: 100%;
+  max-width: 100%;
+  margin: 24px 0 12px;
+  text-align: center;
+  box-sizing: border-box;
+}
+.loomzi-google-divider {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin: 0 0 20px;
+  color: #805f50;
+  font-size: 14px;
+}
+.loomzi-google-divider::before,
+.loomzi-google-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: #e9d5cb;
+}
+.loomzi-google-button {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  min-height: 52px;
+}
+.loomzi-google-button iframe { max-width: 100%; }
+.loomzi-google-error {
+  margin-top: 10px;
+  color: #b42318;
+  font-size: 13px;
+}
+.loomzi-google-signin [role="status"] {
+  margin-top: 10px;
+  color: #6a3a25;
+  font-size: 13px;
+}
+@media (max-width: 480px) {
+  .loomzi-google-signin { margin-top: 20px; }
+  .loomzi-google-divider { margin-bottom: 16px; }
+}

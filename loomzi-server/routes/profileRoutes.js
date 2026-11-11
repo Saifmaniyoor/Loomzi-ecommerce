@@ -9,6 +9,8 @@ const {
   getProfile,
   updateProfile,
   changePassword,
+  requestEmailChange,
+  verifyEmailChange,
 } = require("../controllers/profileController");
 
 // All profile routes require customer login
@@ -20,5 +22,7 @@ router.get("/", getProfile);
 // PATCH /api/profile
 router.patch("/", updateProfile);
 router.patch("/password", changePassword);
+router.post("/email/request", requestEmailChange);
+router.post("/email/verify", verifyEmailChange);
 
 module.exports = router;

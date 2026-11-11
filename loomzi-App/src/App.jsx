@@ -1,3 +1,4 @@
+import GoogleCompleteProfile from "./pages/GoogleCompleteProfile/GoogleCompleteProfile";
 import AdminForgotPassword from "./pages/Admin/Login/AdminForgotPassword";
 import AdminAccountSettings from "./pages/Admin/Settings/AdminAccountSettings";
 
@@ -104,6 +105,7 @@ function App() {
           CUSTOMER AUTHENTICATION PAGES
       =================================== */}
       <Route path="/login" element={<Login />} />
+      <Route path="/google-complete-profile" element={<GoogleCompleteProfile />} />
 
       <Route path="/register" element={<Register />} />
 

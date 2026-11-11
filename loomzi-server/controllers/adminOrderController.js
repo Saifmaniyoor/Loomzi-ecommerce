@@ -10,7 +10,19 @@ const listOrders = async (req, res) => {
   try {
     const page = Math.max(1, Math.min(10000, Number(req.query.page) || 1));
     const status = String(req.query.status || "");
+    const paymentGroup = String(req.query.paymentGroup || "confirmed");
+    if (!["confirmed", "unpaid", "history"].includes(paymentGroup)) {
+      return res.status(400).json({ message: "Invalid payment group" });
+    }
     const filter = STATUSES.includes(status) ? { orderStatus: status } : {};
+    if (paymentGroup === "confirmed") {
+      filter.paymentStatus = "Paid";
+    } else if (paymentGroup === "unpaid") {
+      filter.paymentStatus = { $in: ["Pending", "Failed", "Expired"] };
+    } else {
+      // Keep refunded and other non-active payment records accessible.
+      filter.paymentStatus = { $nin: ["Paid", "Pending", "Failed", "Expired"] };
+    }
     const [orders, total] = await Promise.all([
       Order.find(filter).sort({ createdAt: -1 }).skip((page - 1) * 20).limit(20)
         .populate("user", "fullName email phone").lean(),
@@ -161,7 +173,7 @@ const updateDelivery = async (req, res) => {
     const order = await Order.findById(req.params.id);
     if (!order) return res.status(404).json({ message: "Order not found" });
     if (["Cancelled", "Delivered"].includes(order.orderStatus) && status !== order.orderStatus) return res.status(409).json({ message: "Completed or cancelled orders cannot be reopened here" });
-    if (order.paymentStatus === "Failed" || (order.paymentMethod === "Razorpay" && order.paymentStatus !== "Paid")) return res.status(409).json({ message: "Payment is not confirmed" });
+    if (order.paymentStatus !== "Paid") return res.status(409).json({ message: "Payment is not confirmed. Unpaid orders cannot be fulfilled." });
     const oldIndex = STATUSES.indexOf(order.orderStatus);
     const newIndex = STATUSES.indexOf(status);
     if (newIndex < oldIndex) return res.status(409).json({ message: "Cannot move delivery status backwards" });

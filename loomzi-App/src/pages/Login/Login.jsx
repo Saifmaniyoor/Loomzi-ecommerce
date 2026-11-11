@@ -1,3 +1,4 @@
+import GoogleSignIn from "../../components/GoogleSignIn/GoogleSignIn";
 
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
@@ -292,6 +293,7 @@ function Login() {
           </button>
 
         </form>
+        <GoogleSignIn />
 
         {/* Register */}
         <div className="register-text">

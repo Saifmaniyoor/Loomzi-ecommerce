@@ -64,3 +64,22 @@ export const cancelOrder = async (orderId, refundMethod = "original") => {
 
   return data;
 };
+
+export const downloadOrderInvoice = async (orderId) => {
+  const response = await fetch(`${API_URL}/${encodeURIComponent(orderId)}/invoice`, {
+    credentials: "include",
+  });
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.message || "Failed to download invoice");
+  }
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `Loomzi-Invoice-${orderId}.pdf`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+};

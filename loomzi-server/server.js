@@ -63,9 +63,8 @@ const app = express();
 // 1. CORS Middleware
 // ======================================
 if (process.env.NODE_ENV !== "production") {
-  app.use(cors({ origin: "http://localhost:5174", credentials: true }));
+  app.use(cors({ origin: "http://localhost:5173", credentials: true }));
 }
-app.set("trust proxy", 1);
 
 // ======================================
 // 2. Razorpay Webhook (BEFORE express.json)

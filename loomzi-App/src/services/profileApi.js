@@ -45,3 +45,6 @@ export const changePassword = async (passwordData) => {
 
   return handleResponse(response);
 };
+
+export const requestEmailChange = async (payload) => handleResponse(await fetch(`${API_URL}/email/request`, {method:"POST",credentials:"include",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)}));
+export const verifyEmailChange = async (otp) => handleResponse(await fetch(`${API_URL}/email/verify`, {method:"POST",credentials:"include",headers:{"Content-Type":"application/json"},body:JSON.stringify({otp})}));
